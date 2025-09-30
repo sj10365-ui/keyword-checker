@@ -373,7 +373,7 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
             st.info(yerr); return pd.DataFrame()
 
         top3 = ydf.head(3).copy()
-        st.markdown("##### 🔺 TOP 3 영상")
+        st.markdown("##### TOP 3 영상")
         c1, c2, c3 = st.columns(3)
         cols = [c1, c2, c3]
 
