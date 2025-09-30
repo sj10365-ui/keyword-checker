@@ -4,6 +4,7 @@ import datetime as dt
 import requests
 import pandas as pd
 import streamlit as st
+import time, random
 import isodate  # ISO8601 duration -> seconds
 
 # ---- Config ----
@@ -110,25 +111,69 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24):
     df = pd.DataFrame(rows).sort_values("viewCount", ascending=False)
     return df, None
 
-def google_trends_pytrends(keyword: str, region: str):
-    """최근 7일 Google Trends (pytrends). 키 필요 없음."""
+@st.cache_data(show_spinner=False, ttl=1800)  # 30분 캐시로 과도한 요청 방지
+def _fetch_trends_cached(keyword: str, region: str):
+    # 내부 캐시용 함수: 성공시 (df, None), 실패시 (빈 DF, err_msg) 반환
     try:
         from pytrends.request import TrendReq
     except Exception as e:
         return pd.DataFrame(), f"pytrends 불러오기 실패: {e}"
+
     geo = "" if region == "GLOBAL" else region
-    pytrends = TrendReq(hl="ko-KR", tz=540)
+
+    # (선택) 프록시: Secrets에 PROXY_HTTP/PROXY_HTTPS 넣어두면 사용
+    proxies = {}
+    if os.getenv("PROXY_HTTP"):
+        proxies["http"] = os.getenv("PROXY_HTTP")
+    if os.getenv("PROXY_HTTPS"):
+        proxies["https"] = os.getenv("PROXY_HTTPS")
+
+    # 재시도/백오프/타임아웃/헤더 설정
+    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/125 Safari/537.36"}
     try:
+        pytrends = TrendReq(
+            hl="ko-KR", tz=540,
+            timeout=(10, 30),     # (connect, read)
+            retries=3,            # pytrends 내 재시도
+            backoff_factor=0.5,   # 0.5, 1.0, 2.0 초로 증가
+            requests_args={"headers": headers},
+            proxies=proxies if proxies else None
+        )
+    except Exception as e:
+        return pd.DataFrame(), f"pytrends 초기화 실패: {e}"
+
+    # 첫 시도: now 7-d (실시간 구간)
+    try:
+        # 살짝 지터를 줘서 동시요청 완화
+        time.sleep(0.3 + random.random() * 0.7)
         pytrends.build_payload([keyword], cat=0, timeframe="now 7-d", geo=geo, gprop="")
         df = pytrends.interest_over_time()
-        if df.empty:
+        if df is None or df.empty:
             return pd.DataFrame(), "결과 없음"
         if "isPartial" in df.columns:
             df = df.drop(columns=["isPartial"])
         df = df.reset_index().rename(columns={"date": "datetime", keyword: "interest"})
         return df, None
-    except Exception as e:
-        return pd.DataFrame(), f"Google Trends 오류: {e}"
+    except Exception as e1:
+        msg = str(e1)
+
+    # 429 등으로 막히면 완화된 구간으로 폴백: today 3-m (일 단위)
+    try:
+        time.sleep(1.0 + random.random())  # 백오프
+        pytrends.build_payload([keyword], cat=0, timeframe="today 3-m", geo=geo, gprop="")
+        df = pytrends.interest_over_time()
+        if df is None or df.empty:
+            return pd.DataFrame(), "결과 없음(폴백 구간)"
+        if "isPartial" in df.columns:
+            df = df.drop(columns=["isPartial"])
+        df = df.reset_index().rename(columns={"date": "datetime", keyword: "interest"})
+        return df, None
+    except Exception as e2:
+        return pd.DataFrame(), f"Google Trends 오류(429 가능): {msg} / fallback: {e2}"
+
+def google_trends_pytrends(keyword: str, region: str):
+    """최근 7일(실패 시 3개월) Google Trends. 캐시+백오프+재시도."""
+    return _fetch_trends_cached(keyword, region)
 
 def naver_datalab_searchtrend(keyword: str):
     """네이버 데이터랩 검색어 트렌드(최근 2주, 일 단위). device는 'pc'로 명시."""
