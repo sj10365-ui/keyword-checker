@@ -19,12 +19,15 @@ NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 st.title("🔎 키워드 급증 원인 체크 (최강콘팀용)")
 st.caption("입력한 키워드에 대해 최근 24~72시간(또는 7일) 내 외부 신호(YouTube / Google Trends / 네이버 데이터랩)를 조회해 잠정 원인을 보여줍니다.")
 
-# ---- Inputs ----
-keyword = st.text_input("키워드 입력", value="긴샤치")
-col1, col2, col3 = st.columns(3)
-hours_window = col1.selectbox("윈도우(시간)", [24, 48, 72, 168], index=0)  # 7일(168h) 추가
-region = col2.selectbox("지역", ["KR", "US", "JP", "GLOBAL"], index=0)
-run_btn = col3.button("분석 실행")
+# ---- Inputs (REPLACE THIS BLOCK) ----
+st.markdown("<style>.stForm button { margin-top: 1.9rem; }</style>", unsafe_allow_html=True)
+
+with st.form("controls"):
+    c1, c2, c3, c4 = st.columns([4, 1.2, 1.2, 1.2])  # 가중치로 버튼 칸을 오른쪽에 확보
+    keyword = c1.text_input("키워드 입력", value="긴샤치")
+    hours_window = c2.selectbox("윈도우(시간)", [24, 48, 72, 168], index=0)
+    region = c3.selectbox("지역", ["KR", "US", "JP", "GLOBAL"], index=0)
+    run_btn = c4.form_submit_button("분석 실행", use_container_width=True)
 
 # ---- Helpers ----
 def human_ts(ts: dt.datetime) -> str:
