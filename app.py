@@ -31,6 +31,29 @@ st.markdown("""
 .vid-meta { color:#6b7280; font-size:13px; margin-top:4px; }
 .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #e5e7eb; background:#f3f4f6; }
 .link { text-decoration:none; }
+
+/* 여기서부터 새로 추가 */
+.yt-card{
+  border-radius:12px; background:white; padding:16px;
+  box-shadow:0 2px 8px rgba(0,0,0,.06); border:1px solid #eef2f7;
+  display:flex; flex-direction:column; justify-content:space-between;
+  min-height:160px;
+}
+.yt-rank{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,#6366f1,#22c55e);
+  color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.15);
+}
+.yt-title{
+  font-weight:700; font-size:15px; line-height:1.35; margin:8px 0 6px 0;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.yt-meta{font-size:12px; color:#6b7280; margin-bottom:8px;}
+.badge-green{background:#dcfce7;color:#166534;font-size:11px;padding:2px 8px;border-radius:999px;display:inline-block}
+.badge-blue{background:#dbeafe;color:#1e40af;font-size:11px;padding:2px 8px;border-radius:999px;display:inline-block;margin-left:4px}
+.yt-link{font-size:12px; color:#2563eb; text-decoration:none}
+.divider-space{height:18px}
 </style>
 """, unsafe_allow_html=True)
 
@@ -342,48 +365,57 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
 
     st.markdown(f"**키워드:** `{keyword}` &nbsp;·&nbsp; **윈도우:** 최근 {hours_window}시간 &nbsp;·&nbsp; **지역:** {region}")
 
-    # -------------------- YouTube --------------------
-    def _yt_body():
-        with st.spinner("YouTube 데이터 수집 중..."):
-            ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
-        if yerr:
-            st.info(yerr); return pd.DataFrame()
-        # Top3 highlight (3-columns)
-        top3 = ydf.head(3).copy()
-        c1, c2, c3 = st.columns(3)
-        cols = [c1, c2, c3]
-        for i, (_, r) in enumerate(top3.iterrows()):
-          with cols[i]:
-              meta_badge = (
-                  '<span style="background:#dcfce7; color:#166534; font-size:11px; padding:2px 8px; border-radius:999px; margin-right:4px;">메타매칭</span>'
-                  if r["matchedInMeta"] else ""
-              )
-              comment_badge = (
-                  '<span style="background:#dbeafe; color:#1e40af; font-size:11px; padding:2px 8px; border-radius:999px;">댓글매칭</span>'
-                  if r["matchedInComments"] else ""
-              )
-              st.markdown(f"""
-              <div style="border-radius:12px; background:white; padding:16px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
-                <div style="font-size:12px; color:#9ca3af; margin-bottom:6px;">#{i+1}</div>
-                <div style="font-weight:700; font-size:15px; line-height:1.3; margin-bottom:6px;">
-                  {r['title']}
-                </div>
-                <div style="font-size:12px; color:#6b7280; margin-bottom:8px;">
-                  👤 {r['channel']} &nbsp;·&nbsp; 👁 {r['viewCount']:,}회 &nbsp;·&nbsp; 🎬 {'숏츠' if r['isShorts'] else '일반'}
-                </div>
-                <div style="margin-bottom:10px;">{meta_badge}{comment_badge}</div>
-                <a href="{r['url']}" target="_blank" style="font-size:12px; text-decoration:none; color:#2563eb;">🔗 영상 바로가기</a>
+ # -------------------- YouTube --------------------
+def _yt_body():
+    with st.spinner("YouTube 데이터 수집 중..."):
+        ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
+    if yerr:
+        st.info(yerr)
+        return pd.DataFrame()
+
+    # TOP3
+    top3 = ydf.head(3).copy()
+
+    # TOP3 영역 제목
+    st.markdown("##### 🔺 TOP 3 영상")
+
+    c1, c2, c3 = st.columns(3)
+    cols = [c1, c2, c3]
+
+    for i, (_, r) in enumerate(top3.iterrows()):
+        meta_badge = '<span class="badge-green">메타매칭</span>' if r.get("matchedInMeta") else ""
+        cmt_badge  = '<span class="badge-blue">댓글매칭</span>' if r.get("matchedInComments") else ""
+        is_shorts  = "숏츠" if r.get("isShorts") else "일반"
+        view_txt   = f"{int(r.get('viewCount',0)):,}회"
+
+        with cols[i]:
+            st.markdown(f"""
+            <div class="yt-card">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <div class="yt-rank">{i+1}</div>
+                <div class="yt-title">{r.get('title','')}</div>
               </div>
-              """, unsafe_allow_html=True)
+              <div class="yt-meta">👤 {r.get('channel','')} &nbsp;·&nbsp; 👁 {view_txt} &nbsp;·&nbsp; 🎬 {is_shorts}</div>
+              <div style="margin:6px 0;">{meta_badge}{cmt_badge}</div>
+              <a class="yt-link" target="_blank" href="{r.get('url','')}">🔗 영상 바로가기</a>
+            </div>
+            """, unsafe_allow_html=True)
 
-        st.markdown("###### 전체 목록")
-        st.dataframe(ydf[["title","channel","viewCount","durationSec","isShorts","matchedInMeta","matchedInComments","publishedAt","url"]])
-        return ydf
+    # TOP3와 전체 목록 사이 간격 + 얇은 구분선
+    st.markdown('<div class="divider-space"></div><hr style="border:none;height:1px;background:#eef2f7;">',
+                unsafe_allow_html=True)
 
-    yt_df = None
-    section_card('<span style="color:#ef4444;">🟥 YouTube</span>', lambda: None)
-    # 위에서 바로 렌더 못 하니까 약간의 트릭: 직후에 실제 내용 출력
-    yt_df = _yt_body()
+    # 전체 목록
+    st.markdown("###### 전체 목록")
+    cols_to_show = ["title","channel","viewCount","durationSec","isShorts",
+                    "matchedInMeta","matchedInComments","publishedAt","url"]
+    st.dataframe(ydf[cols_to_show])
+    return ydf
+
+yt_df = None
+section_card('<span style="color:#ef4444;">🟥 YouTube</span>', lambda: None)
+# 바로 아래에서 실제 내용 렌더링
+yt_df = _yt_body()
 
     # -------------------- Google Trends --------------------
     def _trends_body():
