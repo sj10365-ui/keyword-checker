@@ -62,26 +62,35 @@ with st.form("controls"):
 
     # 2) 컨트롤 + 버튼 줄
     c1, c2, c3, c4 = st.columns([4, 1.2, 1.2, 1.2])
-    keyword = c1.text_input("", placeholder="키워드를 입력해주세요",
-                            value=default_keyword, label_visibility="collapsed")
-    hours_window = c2.selectbox("", hours_options,
-                                index=hours_options.index(default_hours),
-                                label_visibility="collapsed")
-    region = c3.selectbox("", region_options,
-                          index=region_options.index(default_region),
-                          label_visibility="collapsed")
+    keyword = c1.text_input(
+        "", placeholder="키워드를 입력해주세요",
+        value=default_keyword, label_visibility="collapsed"
+    )
+    hours_window = c2.selectbox(
+        "", hours_options,
+        index=hours_options.index(default_hours),
+        label_visibility="collapsed"
+    )
+    region = c3.selectbox(
+        "", region_options,
+        index=region_options.index(default_region),
+        label_visibility="collapsed"
+    )
     run_btn = c4.form_submit_button("분석 실행", use_container_width=True, type="primary")
 
     # 옵션
     opt1, _, _, _ = st.columns([2, 2, 2, 2])
     with opt1:
-        broad_mode = st.checkbox("브로드 모드", value=default_broad,
-                                 help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색")
+        broad_mode = st.checkbox(
+            "브로드 모드", value=default_broad,
+            help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색"
+        )
 
-# 실행 직후 URL 업데이트 (공유/북마크용)
-if run_btn:
+# 실행 직후 URL 업데이트 (공유/북마크용) + 자동 실행 플래그
+auto_run = bool((default_keyword or "").strip())  # URL에 q가 있으면 자동 실행
+if run_btn or auto_run:
     st.query_params.update({
-        "q": keyword or "",
+        "q": (keyword or default_keyword or ""),
         "h": str(hours_window),
         "r": region,
         "b": "1" if broad_mode else "0",
@@ -107,6 +116,7 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
         base = (kw or "").strip()
         no_space = base.replace(" ", "")
         v = {base, no_space, f"#{base}", f"#{no_space}",
+             # 필요시 확장(영문/일문/띄어쓰기 변형 등)
              "saeng baekseju", "saengbaekseju",
              "생 백세주", "백세주 생"}
         return [x for x in v if x]
@@ -130,6 +140,7 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
 
     video_ids = list({it.get("id", {}).get("videoId") for it in items if it.get("id", {}).get("videoId")})
 
+    # 브로드 모드: 키워드 없이 최근 업로드도 후보에 추가
     if broad_mode:
         data_b, _ = _yt_request(
             "https://www.googleapis.com/youtube/v3/search",
@@ -211,7 +222,7 @@ def google_trends_pytrends(keyword: str, region: str):
     try:
         from pytrends.request import TrendReq
         pytrends = TrendReq(hl="ko-KR", tz=540)
-        time.sleep(0.3 + random.random() * 0.7)
+        time.sleep(0.3 + random.random() * 0.7)  # 429 완화
         pytrends.build_payload([keyword], timeframe="now 7-d", geo=geo)
         df = pytrends.interest_over_time()
         if df is None or df.empty:
@@ -224,7 +235,7 @@ def google_trends_pytrends(keyword: str, region: str):
         q = urllib.parse.quote(keyword or "")
         web_geo = geo or "KR"
         trends_url = f"https://trends.google.com/trends/explore?geo={web_geo}&q={q}"
-        return pd.DataFrame(), trends_url
+        return pd.DataFrame(), trends_url  # 에러 문구 대신 URL만
 
 def naver_datalab_searchtrend(keyword: str):
     if not (NAVER_CLIENT_ID and NAVER_CLIENT_SECRET):
@@ -256,6 +267,7 @@ def naver_datalab_searchtrend(keyword: str):
 
 def make_judgement(youtube_df, trends_df, naver_df):
     score, reasons = 0, []
+    # YouTube
     if isinstance(youtube_df, pd.DataFrame) and not youtube_df.empty:
         top_views = int(youtube_df["viewCount"].iloc[0])
         total_views = int(youtube_df["viewCount"].sum())
@@ -263,12 +275,14 @@ def make_judgement(youtube_df, trends_df, naver_df):
             score += 2; reasons.append("YouTube 신규 영상/숏츠 영향 (조회수 큼)")
         else:
             score += 1; reasons.append("YouTube 신규 영상 등장")
+    # Google Trends
     if isinstance(trends_df, pd.DataFrame) and not trends_df.empty:
         last = int(trends_df["interest"].iloc[-1])
         med = int(max(trends_df["interest"].median(), 1))
         lift = last / med
         if lift >= 1.5 and last >= 20:
             score += 1; reasons.append(f"Google Trends 상승 (x{lift:.1f})")
+    # Naver
     if isinstance(naver_df, pd.DataFrame) and not naver_df.empty:
         naver_df = naver_df.sort_values("period")
         if len(naver_df) >= 10:
@@ -311,10 +325,15 @@ def render_scored_summary(score: int, verdict: str, reasons: list[str]):
 # --------------------------------------------------------------------------------------
 # Run
 # --------------------------------------------------------------------------------------
-if run_btn and (keyword or "").strip():
+if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
+    # 기본 키워드만 있고 입력칸이 비어 있으면 기본값을 사용
+    if not (keyword or "").strip():
+        keyword = default_keyword
+
     st.subheader(f"키워드: {keyword}")
     st.write(f"분석 윈도우: 최근 {hours_window}시간, 지역: {region}")
 
+    # YouTube
     st.markdown("### 🟥 YouTube")
     ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
     if yerr:
@@ -322,6 +341,7 @@ if run_btn and (keyword or "").strip():
     else:
         st.dataframe(ydf[["title","channel","viewCount","durationSec","isShorts","matchedInMeta","matchedInComments","publishedAt","url"]])
 
+    # Google Trends
     st.markdown("### 🟨 Google Trends (최근 7일)")
     gdf, gerr = google_trends_pytrends(keyword, region)
     if gerr:
@@ -334,6 +354,7 @@ if run_btn and (keyword or "").strip():
         trends_url = f"https://trends.google.com/trends/explore?geo={(region if region!='GLOBAL' else 'KR')}&q={urllib.parse.quote(keyword or '')}"
         st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
 
+    # Naver DataLab
     st.markdown("### 🟩 네이버 데이터랩 (최근 2주)")
     ndf, nerr = naver_datalab_searchtrend(keyword)
     if nerr:
@@ -341,6 +362,7 @@ if run_btn and (keyword or "").strip():
     else:
         st.line_chart(ndf.set_index("period")["search_ratio"])
 
+    # Result
     st.markdown("---")
     verdict, reasons, score = make_judgement(ydf, gdf, ndf)
     render_scored_summary(score, verdict, reasons)
