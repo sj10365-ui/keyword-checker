@@ -14,7 +14,7 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 
-st.title("🔎 키워드 급증 원인 체크 (개인용)")
+st.title("🔎 키워드 급증 원인 체크 (최강콘팀용)")
 st.caption("입력한 키워드에 대해 최근 24~72시간(또는 7일) 내 외부 신호(YouTube / Google Trends / 네이버 데이터랩)를 조회해 잠정 원인을 보여줍니다.")
 
 # ---- Inputs ----
