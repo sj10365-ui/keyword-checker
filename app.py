@@ -12,35 +12,14 @@ import isodate  # ISO8601 duration -> seconds
 # --------------------------------------------------------------------------------------
 # Page config
 # --------------------------------------------------------------------------------------
-st.set_page_config(page_title="키워드 급증 원인 체크", page_icon="🔎", layout="wide")
+st.set_page_config(page_title="키워드 급증 원인 체크", layout="centered")
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 
-# ---- Global small CSS polish ---------------------------------------------------------
-st.markdown("""
-<style>
-/* 전체 컨테이너 폭/여백 조정 */
-.block-container { max-width: 1200px; padding-top: 12px; }
-/* 섹션 카드 스타일 */
-.section-card { border:1px solid #e5e7eb; border-radius:16px; padding:18px 18px; background:#fafafa; }
-.section-title { margin:0 0 10px 0; font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px; }
-/* 유튜브 Top 카드 */
-.vid-card { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:white; }
-.vid-meta { color:#6b7280; font-size:13px; margin-top:4px; }
-.badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #e5e7eb; background:#f3f4f6; }
-.link { text-decoration:none; }
-</style>
-""", unsafe_allow_html=True)
-
-# ---- Hero ---------------------------------------------------------------------------
-st.markdown("""
-<div style="text-align:center; margin:8px 0 14px 0;">
-  <div style="font-size:34px; font-weight:800;">🔎 키워드 급증 원인 체크</div>
-  <div style="color:#6b7280;">YouTube · Google Trends · 네이버 데이터랩</div>
-</div>
-""", unsafe_allow_html=True)
+st.title("🔎 키워드 급증 원인 체크(최강콘팀용)")
+st.caption("입력한 키워드에 대해 최근 24~168시간 내 외부 신호(YouTube / Google Trends / 네이버 데이터랩)를 조회해 잠정 원인을 보여줍니다.")
 
 # --------------------------------------------------------------------------------------
 # URL Query Params -> Defaults
@@ -71,25 +50,43 @@ default_region = r_raw if r_raw in region_options else "KR"
 default_broad = (str(b_raw) == "1")
 
 # --------------------------------------------------------------------------------------
-# Controls (레이블 줄 + 컨트롤 줄)
+# Controls (폼 + 깔끔 정렬)
 # --------------------------------------------------------------------------------------
 with st.form("controls"):
+    # 1) 레이블 줄
     lh1, lh2, lh3, lh4 = st.columns([4, 1.2, 1.2, 1.2])
-    lh1.markdown("**키워드 입력**"); lh2.markdown("**탐색 시간**"); lh3.markdown("**지역**"); lh4.markdown("&nbsp;")
+    lh1.markdown("**키워드 입력**")
+    lh2.markdown("**탐색 시간**")
+    lh3.markdown("**지역**")
+    lh4.markdown("&nbsp;")  # 버튼 자리용 placeholder
 
+    # 2) 컨트롤 + 버튼 줄
     c1, c2, c3, c4 = st.columns([4, 1.2, 1.2, 1.2])
-    keyword = c1.text_input("", placeholder="키워드를 입력해주세요",
-                            value=default_keyword, label_visibility="collapsed")
-    hours_window = c2.selectbox("", hours_options, index=hours_options.index(default_hours), label_visibility="collapsed")
-    region = c3.selectbox("", region_options, index=region_options.index(default_region), label_visibility="collapsed")
+    keyword = c1.text_input(
+        "", placeholder="키워드를 입력해주세요",
+        value=default_keyword, label_visibility="collapsed"
+    )
+    hours_window = c2.selectbox(
+        "", hours_options,
+        index=hours_options.index(default_hours),
+        label_visibility="collapsed"
+    )
+    region = c3.selectbox(
+        "", region_options,
+        index=region_options.index(default_region),
+        label_visibility="collapsed"
+    )
     run_btn = c4.form_submit_button("분석 실행", use_container_width=True, type="primary")
 
-    opt1, opt2, opt3, opt4 = st.columns([2, 2, 2, 2])
+    # 옵션
+    opt1, _, _, _ = st.columns([2, 2, 2, 2])
     with opt1:
-        broad_mode = st.checkbox("브로드 모드", value=default_broad,
-                                 help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색")
+        broad_mode = st.checkbox(
+            "브로드 모드", value=default_broad,
+            help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색"
+        )
 
-# 실행 직후 URL 업데이트 + 자동 실행 플래그
+# 실행 직후 URL 업데이트 (공유/북마크용) + 자동 실행 플래그
 auto_run = bool((default_keyword or "").strip())  # URL에 q가 있으면 자동 실행
 if run_btn or auto_run:
     st.query_params.update({
@@ -119,7 +116,9 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
         base = (kw or "").strip()
         no_space = base.replace(" ", "")
         v = {base, no_space, f"#{base}", f"#{no_space}",
-             "saeng baekseju", "saengbaekseju", "생 백세주", "백세주 생"}
+             # 필요시 확장(영문/일문/띄어쓰기 변형 등)
+             "saeng baekseju", "saengbaekseju",
+             "생 백세주", "백세주 생"}
         return [x for x in v if x]
 
     published_after = (dt.datetime.utcnow() - dt.timedelta(hours=hours)).isoformat("T") + "Z"
@@ -307,13 +306,13 @@ def render_scored_summary(score: int, verdict: str, reasons: list[str]):
     theme = _score_theme(score)
     frac = max(0, min(score, 4)) / 4
     st.markdown(f"""
-    <div style="border:1px solid {theme['color']}; border-radius:16px; padding:16px 18px; margin:8px 0; background:white;">
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+    <div style="border:1px solid {theme['color']}; border-radius:12px; padding:14px 16px; margin:8px 0;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
         <span style="font-size:22px;">{theme['emoji']}</span>
-        <div style="font-weight:800; font-size:18px;">{theme['title']}</div>
+        <div style="font-weight:700; font-size:18px;">{theme['title']}</div>
         <div style="margin-left:auto; font-size:13px; opacity:.8;">스코어 <b>{score}</b> / 4</div>
       </div>
-      <div style="height:8px; width:100%; background:#e5e7eb; border-radius:999px; overflow:hidden; margin:6px 0 12px;">
+      <div style="height:8px; width:100%; background:#e5e7eb; border-radius:999px; overflow:hidden; margin:6px 0 10px;">
         <div style="height:100%; width:{frac*100:.0f}%; background:{theme['color']};"></div>
       </div>
       <div style="font-size:14px; line-height:1.5;">
@@ -323,93 +322,50 @@ def render_scored_summary(score: int, verdict: str, reasons: list[str]):
     </div>
     """, unsafe_allow_html=True)
 
-# ---- Small section wrapper -----------------------------------------------------------
-def section_card(title_html: str, body_render_fn):
-    st.markdown(f'<div class="section-card"><div class="section-title">{title_html}</div>', unsafe_allow_html=True)
-    body_render_fn()
-    st.markdown('</div>', unsafe_allow_html=True)
-
 # --------------------------------------------------------------------------------------
 # Run
 # --------------------------------------------------------------------------------------
 if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
+    # 기본 키워드만 있고 입력칸이 비어 있으면 기본값을 사용
     if not (keyword or "").strip():
         keyword = default_keyword
 
-    st.markdown(f"**키워드:** `{keyword}` &nbsp;·&nbsp; **윈도우:** 최근 {hours_window}시간 &nbsp;·&nbsp; **지역:** {region}")
+    st.subheader(f"키워드: {keyword}")
+    st.write(f"분석 윈도우: 최근 {hours_window}시간, 지역: {region}")
 
-    # -------------------- YouTube --------------------
-    def _yt_body():
-        with st.spinner("YouTube 데이터 수집 중..."):
-            ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
-        if yerr:
-            st.info(yerr); return pd.DataFrame()
-        # Top3 highlight (3-columns)
-        top3 = ydf.head(3).copy()
-        c1, c2, c3 = st.columns(3)
-        cols = [c1, c2, c3]
-        for i, (_, r) in enumerate(top3.iterrows()):
-            with cols[i]:
-                st.markdown(f"""
-                <div class="vid-card">
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <div class="badge">#{i+1}</div>
-                    <div style="font-weight:700; line-height:1.2;">{r['title']}</div>
-                  </div>
-                  <div class="vid-meta">채널 {r['channel']} · 조회수 {r['viewCount']:,} · {'숏츠' if r['isShorts'] else '일반'}</div>
-                  <div style="margin-top:8px;">
-                    <a class="link" target="_blank" href="{r['url']}">🔗 영상 바로가기</a>
-                    {"&nbsp;&nbsp;·&nbsp;&nbsp;✅ 메타매칭" if r['matchedInMeta'] else ""}
-                    {"&nbsp;&nbsp;·&nbsp;&nbsp;💬 댓글매칭" if r['matchedInComments'] else ""}
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        st.markdown("###### 전체 목록")
+    # YouTube
+    st.markdown("### 🟥 YouTube")
+    ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
+    if yerr:
+        st.info(yerr); ydf = pd.DataFrame()
+    else:
         st.dataframe(ydf[["title","channel","viewCount","durationSec","isShorts","matchedInMeta","matchedInComments","publishedAt","url"]])
-        return ydf
 
-    yt_df = None
-    section_card('<span style="color:#ef4444;">🟥 YouTube</span>', lambda: None)
-    # 위에서 바로 렌더 못 하니까 약간의 트릭: 직후에 실제 내용 출력
-    yt_df = _yt_body()
-
-    # -------------------- Google Trends --------------------
-    def _trends_body():
-        with st.spinner("Google Trends 로딩 중..."):
-            gdf, gerr = google_trends_pytrends(keyword, region)
-        if gerr:
-            trends_url = gerr if str(gerr).startswith("http") else f"https://trends.google.com/trends/explore?geo={region or 'KR'}&q={urllib.parse.quote(keyword or '')}"
-            st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
-            st.caption("일시적 제한으로 내부 차트를 생략했습니다.")
-            return pd.DataFrame()
+    # Google Trends
+    st.markdown("### 🟨 Google Trends (최근 7일)")
+    gdf, gerr = google_trends_pytrends(keyword, region)
+    if gerr:
+        trends_url = gerr if str(gerr).startswith("http") else f"https://trends.google.com/trends/explore?geo={region or 'KR'}&q={urllib.parse.quote(keyword or '')}"
+        st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
+        st.caption("일시적 제한으로 내부 차트를 생략했습니다.")
+        gdf = pd.DataFrame()
+    else:
         st.line_chart(gdf.set_index("datetime")["interest"])
         trends_url = f"https://trends.google.com/trends/explore?geo={(region if region!='GLOBAL' else 'KR')}&q={urllib.parse.quote(keyword or '')}"
         st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
-        return gdf
 
-    st.markdown('<div class="section-card"><div class="section-title" style="color:#3b82f6;">🟨 Google Trends</div>', unsafe_allow_html=True)
-    tr_df = _trends_body()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # -------------------- Naver DataLab --------------------
-    def _naver_body():
-        with st.spinner("네이버 데이터랩 불러오는 중..."):
-            ndf, nerr = naver_datalab_searchtrend(keyword)
-        if nerr:
-            st.info(nerr); return pd.DataFrame()
+    # Naver DataLab
+    st.markdown("### 🟩 네이버 데이터랩 (최근 2주)")
+    ndf, nerr = naver_datalab_searchtrend(keyword)
+    if nerr:
+        st.info(nerr); ndf = pd.DataFrame()
+    else:
         st.line_chart(ndf.set_index("period")["search_ratio"])
-        return ndf
 
-    st.markdown('<div class="section-card"><div class="section-title" style="color:#16a34a;">🟩 네이버 데이터랩</div>', unsafe_allow_html=True)
-    nv_df = _naver_body()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # -------------------- Summary Card --------------------
+    # Result
     st.markdown("---")
-    verdict, reasons, score = make_judgement(yt_df, tr_df, nv_df)
+    verdict, reasons, score = make_judgement(ydf, gdf, ndf)
     render_scored_summary(score, verdict, reasons)
     st.caption("※ 자동 추정 결과이며, 실제 원인은 추가 확인이 필요할 수 있습니다.")
-
 else:
     st.write("키워드를 입력하고 **분석 실행**을 눌러주세요.")
