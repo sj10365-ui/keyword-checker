@@ -5,6 +5,7 @@ import requests
 import pandas as pd
 import streamlit as st
 import time, random
+import urllib.parse
 import isodate  # ISO8601 duration -> seconds
 
 # ---- Config ----
@@ -172,8 +173,26 @@ def _fetch_trends_cached(keyword: str, region: str):
         return pd.DataFrame(), f"Google Trends 오류(429 가능): {msg} / fallback: {e2}"
 
 def google_trends_pytrends(keyword: str, region: str):
-    """최근 7일(실패 시 3개월) Google Trends. 캐시+백오프+재시도."""
-    return _fetch_trends_cached(keyword, region)
+    """Google Trends: 가능하면 pytrends로 그래프, 실패하면 링크 제공."""
+    geo = "" if region == "GLOBAL" else region
+    try:
+        # pytrends가 설치되어 있고 동작하면 그래프 반환
+        from pytrends.request import TrendReq
+        pytrends = TrendReq(hl="ko-KR", tz=540)  # 최소 옵션
+        pytrends.build_payload([keyword], timeframe="now 7-d", geo=geo)
+        df = pytrends.interest_over_time()
+        if df is None or df.empty:
+            return pd.DataFrame(), "결과 없음"
+        if "isPartial" in df.columns:
+            df = df.drop(columns=["isPartial"])
+        df = df.reset_index().rename(columns={"date": "datetime", keyword: "interest"})
+        return df, None
+    except Exception as e:
+        # pytrends 미설치/오류 → 링크로 우회
+        q = urllib.parse.quote(keyword)
+        web_geo = geo or "KR"
+        trends_url = f"https://trends.google.com/trends/explore?geo={web_geo}&q={q}"
+        return pd.DataFrame(), f"Google Trends 사용 불가: {repr(e)}\n직접 확인: {trends_url}"
 
 def naver_datalab_searchtrend(keyword: str):
     """네이버 데이터랩 검색어 트렌드(최근 2주, 일 단위). device는 'pc'로 명시."""
@@ -286,6 +305,7 @@ if run_btn and keyword.strip():
     st.markdown("### 🟨 Google Trends (최근 7일)")
     gdf, gerr = google_trends_pytrends(keyword, region)
     if gerr:
+        # 에러 문구 그대로 보여주고, 안에 들어있는 링크는 클릭 가능
         st.info(gerr)
         gdf = pd.DataFrame()
     else:
