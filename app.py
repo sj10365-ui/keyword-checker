@@ -18,7 +18,7 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 
-st.title("🔎 키워드 급증 원인 체크")
+st.title("🔎 키워드 급증 원인 체크(최강콘팀용)")
 st.caption("입력한 키워드에 대해 최근 24~72시간(또는 7일) 내 외부 신호(YouTube / Google Trends / 네이버 데이터랩)를 조회해 잠정 원인을 보여줍니다.")
 
 # --------------------------------------------------------------------------------------
@@ -28,7 +28,7 @@ with st.form("controls"):
     # 1) 레이블 줄
     lh1, lh2, lh3, lh4 = st.columns([4, 1.2, 1.2, 1.2])
     lh1.markdown("**키워드 입력**")
-    lh2.markdown("**윈도우(시간)**")
+    lh2.markdown("**탐색 시간**")
     lh3.markdown("**지역**")
     lh4.markdown("&nbsp;")  # 버튼 자리용 placeholder
 
