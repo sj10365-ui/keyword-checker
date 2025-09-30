@@ -20,21 +20,15 @@ st.title("🔎 키워드 급증 원인 체크 (최강콘팀용)")
 st.caption("입력한 키워드에 대해 최근 24~72시간(또는 7일) 내 외부 신호(YouTube / Google Trends / 네이버 데이터랩)를 조회해 잠정 원인을 보여줍니다.")
 
 # ---- Inputs (REPLACE THIS BLOCK) ----
-st.markdown("""
-<style>
-div[data-testid="stForm"] .stFormSubmitButton button {
-    margin-top: 1.6rem;   /* 입력 박스 라벨 높이에 맞춰 정렬 */
-    height: 2.6rem;       /* 버튼 높이 기본값보다 살짝 키움 */
-    font-size: 0.9rem;    /* 글씨 크기는 살짝 키움 (선택사항) */
-}
-</style>
-""", unsafe_allow_html=True)
-
 with st.form("controls"):
     c1, c2, c3, c4 = st.columns([4, 1.2, 1.2, 1.2])
-    keyword = c1.text_input("키워드 입력", value="긴샤치")
+
+    keyword = c1.text_input("키워드 입력", value="키워드를 입력해주세요")
     hours_window = c2.selectbox("윈도우(시간)", [24, 48, 72, 168], index=0)
     region = c3.selectbox("지역", ["KR", "US", "JP", "GLOBAL"], index=0)
+
+    # 버튼을 입력 라벨 높이만큼 내려 정렬
+    c4.markdown("<div style='height:2.2rem'></div>", unsafe_allow_html=True)  # 필요시 2.4~2.8로 미세조정
     run_btn = c4.form_submit_button("분석 실행", use_container_width=True)
 
 # ---- Helpers ----
