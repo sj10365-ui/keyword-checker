@@ -303,6 +303,40 @@ def make_judgement(youtube_df, trends_df, naver_df):
     else: verdict = "외부 신호 증거 부족 (내부 요인/우연 가능)"
     return verdict, reasons, score
 
+# ---- Result styling helpers ----
+def _score_theme(score: int):
+    # max 4점: (YT 0~2) + (Trends 0~1) + (Naver 0~1)
+    if score >= 3:
+        return {"emoji":"🔥","title":"복합 외부 요인 폭발","color":"#ef4444"}  # red
+    if score == 2:
+        return {"emoji":"🟧","title":"단일 채널 영향","color":"#f97316"}        # orange
+    if score == 1:
+        return {"emoji":"🟨","title":"약한 외부 신호","color":"#eab308"}        # yellow
+    return {"emoji":"🟩","title":"외부 신호 없음","color":"#22c55e"}            # green
+
+def render_scored_summary(score: int, verdict: str, reasons: list[str]):
+    theme = _score_theme(score)
+    frac = max(0, min(score, 4)) / 4
+    # 카드 스타일
+    st.markdown(f"""
+    <div style="
+        border:1px solid {theme['color']}; border-radius:12px; padding:14px 16px; margin:8px 0;
+        background: rgba(0,0,0,0);">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+        <span style="font-size:22px;">{theme['emoji']}</span>
+        <div style="font-weight:700; font-size:18px;">{theme['title']}</div>
+        <div style="margin-left:auto; font-size:13px; opacity:.8;">스코어 <b>{score}</b> / 4</div>
+      </div>
+      <div style="height:8px; width:100%; background:#e5e7eb; border-radius:999px; overflow:hidden; margin:6px 0 10px;">
+        <div style="height:100%; width:{frac*100:.0f}%; background:{theme['color']};"></div>
+      </div>
+      <div style="font-size:14px; line-height:1.5;">
+        <div style="opacity:.8; margin-bottom:6px;"><b>잠정 결론</b>: {verdict}</div>
+        {"".join(f"<div>• {r}</div>" for r in (reasons or ["근거 신호 없음"]))}
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 # --------------------------------------------------------------------------------------
 # Run
 # --------------------------------------------------------------------------------------
@@ -342,12 +376,10 @@ if run_btn and (keyword or "").strip():
     else:
         st.line_chart(ndf.set_index("period")["search_ratio"])
 
-    # Verdict
+    # ---- Result (REPLACE THIS BLOCK) ----
     st.markdown("---")
     verdict, reasons, score = make_judgement(ydf, gdf, ndf)
-    st.markdown(f"## ✅ 잠정 결론: {verdict}  \n**스코어:** {score}")
-    if reasons:
-        st.write("- " + "\n- ".join(reasons))
+    render_scored_summary(score, verdict, reasons)
     st.caption("※ 자동 추정 결과이며, 실제 원인은 추가 확인이 필요할 수 있습니다.")
 else:
     st.write("키워드를 입력하고 **분석 실행**을 눌러주세요.")
