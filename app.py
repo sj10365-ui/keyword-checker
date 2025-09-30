@@ -365,57 +365,45 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
 
     st.markdown(f"**키워드:** `{keyword}` &nbsp;·&nbsp; **윈도우:** 최근 {hours_window}시간 &nbsp;·&nbsp; **지역:** {region}")
 
-# -------------------- YouTube --------------------
-def _yt_body():
-    with st.spinner("YouTube 데이터 수집 중..."):
-        ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
-    if yerr:
-        st.info(yerr)
-        return pd.DataFrame()
+    # -------------------- YouTube --------------------
+    def _yt_body():
+        with st.spinner("YouTube 데이터 수집 중..."):
+            ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
+        if yerr:
+            st.info(yerr); return pd.DataFrame()
 
-    # TOP3
-    top3 = ydf.head(3).copy()
+        top3 = ydf.head(3).copy()
+        st.markdown("##### 🔺 TOP 3 영상")
+        c1, c2, c3 = st.columns(3)
+        cols = [c1, c2, c3]
 
-    # TOP3 영역 제목
-    st.markdown("##### 🔺 TOP 3 영상")
+        for i, (_, r) in enumerate(top3.iterrows()):
+            meta_badge = '<span class="badge-green">메타매칭</span>' if r.get("matchedInMeta") else ""
+            cmt_badge  = '<span class="badge-blue">댓글매칭</span>'  if r.get("matchedInComments") else ""
+            is_shorts  = "숏츠" if r.get("isShorts") else "일반"
+            view_txt   = f"{int(r.get('viewCount',0)):,}회"
 
-    c1, c2, c3 = st.columns(3)
-    cols = [c1, c2, c3]
+            with cols[i]:
+                st.markdown(f"""
+                <div class="yt-card">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    <div class="yt-rank">{i+1}</div>
+                    <div class="yt-title">{r.get('title','')}</div>
+                  </div>
+                  <div class="yt-meta">👤 {r.get('channel','')} &nbsp;·&nbsp; 👁 {view_txt} &nbsp;·&nbsp; 🎬 {is_shorts}</div>
+                  <div style="margin:6px 0;">{meta_badge}{cmt_badge}</div>
+                  <a class="yt-link" target="_blank" href="{r.get('url','')}">🔗 영상 바로가기</a>
+                </div>
+                """, unsafe_allow_html=True)
 
-    for i, (_, r) in enumerate(top3.iterrows()):
-        meta_badge = '<span class="badge-green">메타매칭</span>' if r.get("matchedInMeta") else ""
-        cmt_badge  = '<span class="badge-blue">댓글매칭</span>' if r.get("matchedInComments") else ""
-        is_shorts  = "숏츠" if r.get("isShorts") else "일반"
-        view_txt   = f"{int(r.get('viewCount',0)):,}회"
-
-        with cols[i]:
-            st.markdown(f"""
-            <div class="yt-card">
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                <div class="yt-rank">{i+1}</div>
-                <div class="yt-title">{r.get('title','')}</div>
-              </div>
-              <div class="yt-meta">👤 {r.get('channel','')} &nbsp;·&nbsp; 👁 {view_txt} &nbsp;·&nbsp; 🎬 {is_shorts}</div>
-              <div style="margin:6px 0;">{meta_badge}{cmt_badge}</div>
-              <a class="yt-link" target="_blank" href="{r.get('url','')}">🔗 영상 바로가기</a>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # TOP3와 전체 목록 사이 간격 + 얇은 구분선
-    st.markdown('<div class="divider-space"></div><hr style="border:none;height:1px;background:#eef2f7;">',
-                unsafe_allow_html=True)
-
-    # 전체 목록
-    st.markdown("###### 전체 목록")
-    cols_to_show = ["title","channel","viewCount","durationSec","isShorts",
-                    "matchedInMeta","matchedInComments","publishedAt","url"]
-    st.dataframe(ydf[cols_to_show])
-    return ydf
-
+        st.markdown('<div class="divider-space"></div><hr style="border:none;height:1px;background:#eef2f7;">', unsafe_allow_html=True)
+        st.markdown("###### 전체 목록")
+        cols_to_show = ["title","channel","viewCount","durationSec","isShorts","matchedInMeta","matchedInComments","publishedAt","url"]
+        st.dataframe(ydf[cols_to_show])
+        return ydf
 
     yt_df = None
     section_card('<span style="color:#ef4444;">🟥 YouTube</span>', lambda: None)
-    # 바로 아래에서 실제 내용 렌더링
     yt_df = _yt_body()
 
     # -------------------- Google Trends --------------------
