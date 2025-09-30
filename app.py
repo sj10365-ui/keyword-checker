@@ -379,7 +379,7 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
         top3 = ydf.head(3).copy()
 
         # TOP3 영역 제목
-        st.markdown("##### 🔺 TOP 3 영상")
+        st.markdown("#####  TOP 3 영상")
 
         c1, c2, c3 = st.columns(3)
         cols = [c1, c2, c3]
