@@ -19,17 +19,17 @@ NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 st.title("🔎 키워드 급증 원인 체크 (최강콘팀용)")
 st.caption("입력한 키워드에 대해 최근 24~72시간(또는 7일) 내 외부 신호(YouTube / Google Trends / 네이버 데이터랩)를 조회해 잠정 원인을 보여줍니다.")
 
-# ---- Inputs (REPLACE THIS BLOCK) ----
+# ---- Inputs (ALTERNATIVE) ----
 with st.form("controls"):
-    c1, c2, c3, c4 = st.columns([4, 1.2, 1.2, 1.2])
+    r1c1, r1c2, r1c3 = st.columns([4, 1.2, 1.2])
+    keyword = r1c1.text_input("키워드 입력", placeholder="키워드를 입력해주세요")
+    hours_window = r1c2.selectbox("윈도우(시간)", [24, 48, 72, 168], index=0)
+    region = r1c3.selectbox("지역", ["KR", "US", "JP", "GLOBAL"], index=0)
 
-    keyword = c1.text_input("키워드 입력", placeholder="키워드를 입력해주세요")
-    hours_window = c2.selectbox("윈도우(시간)", [24, 48, 72, 168], index=0)
-    region = c3.selectbox("지역", ["KR", "US", "JP", "GLOBAL"], index=0)
-
-    # 버튼을 입력 컴포넌트와 baseline 맞추기 (필요시 2.4~2.8로 미세조정)
-    c4.markdown("<div style='height:2.6rem'></div>", unsafe_allow_html=True)
-    run_btn = c4.form_submit_button("분석 실행", use_container_width=True, type="primary")
+    # 다음 줄: 오른쪽 정렬 버튼
+    r2c1, r2c2, r2c3, r2c4 = st.columns([4, 1.2, 1.2, 1.2])
+    with r2c4:
+        run_btn = st.form_submit_button("분석 실행", use_container_width=True, type="primary")
 
 # ---- Helpers ----
 def human_ts(ts: dt.datetime) -> str:
