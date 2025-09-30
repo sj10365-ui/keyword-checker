@@ -1,10 +1,10 @@
-
 import os
+import json
 import datetime as dt
 import requests
 import pandas as pd
 import streamlit as st
-import json
+import isodate  # ISO8601 duration -> seconds
 
 # ---- Config ----
 st.set_page_config(page_title="키워드 급증 원인 체크", layout="centered")
@@ -14,12 +14,12 @@ NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 
 st.title("🔎 키워드 급증 원인 체크 (개인용)")
-st.caption("입력한 키워드에 대해 최근 24~72시간 내 외부 신호(YouTube / Google Trends / 네이버 데이터랩)를 조회해 잠정 원인을 보여줍니다.")
+st.caption("입력한 키워드에 대해 최근 24~72시간(또는 7일) 내 외부 신호(YouTube / Google Trends / 네이버 데이터랩)를 조회해 잠정 원인을 보여줍니다.")
 
 # ---- Inputs ----
 keyword = st.text_input("키워드 입력", value="긴샤치")
 col1, col2, col3 = st.columns(3)
-hours_window = col1.selectbox("윈도우(시간)", [24, 48, 72], index=0)
+hours_window = col1.selectbox("윈도우(시간)", [24, 48, 72, 168], index=0)  # 7일(168h) 추가
 region = col2.selectbox("지역", ["KR", "US", "JP", "GLOBAL"], index=0)
 run_btn = col3.button("분석 실행")
 
@@ -28,9 +28,12 @@ def human_ts(ts: dt.datetime) -> str:
     return ts.strftime("%Y-%m-%d %H:%M")
 
 def youtube_search(keyword: str, api_key: str, hours: int = 24):
+    """최근 hours 내 업로드된 유튜브 영상(숏츠 포함)을 조회하고, 길이/숏츠 여부까지 반환."""
     if not api_key:
         return pd.DataFrame(), "환경변수 YOUTUBE_API_KEY가 없습니다."
     published_after = (dt.datetime.utcnow() - dt.timedelta(hours=hours)).isoformat("T") + "Z"
+
+    # 최근 업로드 검색
     url = "https://www.googleapis.com/youtube/v3/search"
     params = {
         "part": "snippet",
@@ -47,38 +50,47 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24):
     items = r.json().get("items", [])
     if not items:
         return pd.DataFrame(), "최근 업로드 결과 없음"
-    video_ids = [it["id"]["videoId"] for it in items if "videoId" in it.get("id", {})]
+    video_ids = [it.get("id", {}).get("videoId") for it in items if it.get("id", {}).get("videoId")]
     if not video_ids:
         return pd.DataFrame(), "최근 업로드 결과 없음"
-    # fetch statistics
+
+    # 상세 정보(통계 + 길이) 조회
     url2 = "https://www.googleapis.com/youtube/v3/videos"
     params2 = {
-        "part": "statistics,snippet",
+        "part": "statistics,snippet,contentDetails",
         "id": ",".join(video_ids),
         "key": api_key,
     }
     r2 = requests.get(url2, params=params2, timeout=20)
     if r2.status_code != 200:
         return pd.DataFrame(), f"YOUTUBE videos 오류: {r2.status_code} {r2.text[:200]}"
+
     rows = []
     for it in r2.json().get("items", []):
-        stats = it.get("statistics", {})
-        snip = it.get("snippet", {})
+        stats = it.get("statistics", {}) or {}
+        snip = it.get("snippet", {}) or {}
+        cd = it.get("contentDetails", {}) or {}
+        duration_iso = cd.get("duration")
+        try:
+            duration_sec = int(isodate.parse_duration(duration_iso).total_seconds()) if duration_iso else None
+        except Exception:
+            duration_sec = None
+        is_shorts = duration_sec is not None and duration_sec <= 60
         rows.append({
             "videoId": it.get("id"),
             "title": snip.get("title"),
             "channel": snip.get("channelTitle"),
             "publishedAt": snip.get("publishedAt"),
-            "viewCount": int(stats.get("viewCount", 0)),
-            "likeCount": int(stats.get("likeCount", 0)) if stats.get("likeCount") else None,
-            "commentCount": int(stats.get("commentCount", 0)) if stats.get("commentCount") else None,
+            "viewCount": int(stats.get("viewCount", 0)) if stats.get("viewCount") else 0,
+            "durationSec": duration_sec,
+            "isShorts": is_shorts,
             "url": f"https://www.youtube.com/watch?v={it.get('id')}"
         })
     df = pd.DataFrame(rows).sort_values("viewCount", ascending=False)
     return df, None
 
 def google_trends_pytrends(keyword: str, region: str):
-    # Lazy import to avoid dependency if user doesn't need it
+    """최근 7일 Google Trends (pytrends). 키 필요 없음."""
     try:
         from pytrends.request import TrendReq
     except Exception as e:
@@ -98,6 +110,7 @@ def google_trends_pytrends(keyword: str, region: str):
         return pd.DataFrame(), f"Google Trends 오류: {e}"
 
 def naver_datalab_searchtrend(keyword: str):
+    """네이버 데이터랩 검색어 트렌드(최근 2주, 일 단위). device 필드 제거(전체 집계)."""
     if not (NAVER_CLIENT_ID and NAVER_CLIENT_SECRET):
         return pd.DataFrame(), "NAVER_CLIENT_ID/SECRET 환경변수가 없습니다."
     url = "https://openapi.naver.com/v1/datalab/search"
@@ -115,10 +128,8 @@ def naver_datalab_searchtrend(keyword: str):
         "timeUnit": "date",
         "keywordGroups": [
             {"groupName": keyword, "keywords": [keyword]}
-        ],
-        "device": "pc,mobile",
-        "ages": [],
-        "gender": ""
+        ]
+        # device 제거(전체), 모바일만: "device": "mo", PC만: "device": "pc"
     }
     r = requests.post(url, headers=headers, data=json.dumps(body), timeout=20)
     if r.status_code != 200:
@@ -136,10 +147,11 @@ def naver_datalab_searchtrend(keyword: str):
     return df, None
 
 def make_judgement(youtube_df, trends_df, naver_df):
+    """간단 점수화 규칙으로 잠정 결론 생성."""
     score = 0
     reasons = []
     # YouTube rule
-    if not youtube_df.empty:
+    if isinstance(youtube_df, pd.DataFrame) and not youtube_df.empty:
         top_views = int(youtube_df["viewCount"].iloc[0])
         total_views = int(youtube_df["viewCount"].sum())
         if top_views >= 50000 or total_views >= 100000:
@@ -148,24 +160,25 @@ def make_judgement(youtube_df, trends_df, naver_df):
         else:
             score += 1
             reasons.append("YouTube 신규 영상 등장")
-    # Google Trends rule: 최근 값 vs 7일 중앙값 비교
-    if not trends_df.empty:
+    # Google Trends rule: 최근 값 vs 7일 중앙값
+    if isinstance(trends_df, pd.DataFrame) and not trends_df.empty:
         last = int(trends_df["interest"].iloc[-1])
-        med = int(trends_df["interest"].median()) if trends_df["interest"].median() > 0 else 1
+        med_val = trends_df["interest"].median()
+        med = int(med_val) if med_val and med_val > 0 else 1
         lift = (last / med) if med else 0
         if lift >= 1.5 and last >= 20:
             score += 1
             reasons.append(f"Google Trends 상승 (x{lift:.1f})")
-    # Naver DataLab rule: 최근 3일 평균 vs 이전 7일 평균
-    if not naver_df.empty:
+    # Naver rule: 최근 3일 평균 vs 이전 7일 평균
+    if isinstance(naver_df, pd.DataFrame) and not naver_df.empty:
         naver_df = naver_df.sort_values("period")
         if len(naver_df) >= 10:
             recent = naver_df.tail(3)["search_ratio"].mean()
             prev = naver_df.tail(10).head(7)["search_ratio"].mean()
-            if prev > 0 and (recent/prev) >= 1.3:
+            if prev and prev > 0 and (recent / prev) >= 1.3:
                 score += 1
                 reasons.append("네이버 데이터랩 상승")
-    # Verdict
+
     if score >= 3:
         verdict = "복합 외부 요인 가능성 높음"
     elif score == 2:
@@ -186,14 +199,18 @@ if run_btn and keyword.strip():
     ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window)
     if yerr:
         st.info(yerr)
+        ydf = pd.DataFrame()
     else:
-        st.dataframe(ydf[["title","channel","viewCount","publishedAt","url"]])
+        # 결과 표 (숏츠 표시)
+        show_cols = ["title", "channel", "viewCount", "durationSec", "isShorts", "publishedAt", "url"]
+        st.dataframe(ydf[show_cols])
 
     # Google Trends
     st.markdown("### 🟨 Google Trends (최근 7일)")
     gdf, gerr = google_trends_pytrends(keyword, region)
     if gerr:
         st.info(gerr)
+        gdf = pd.DataFrame()
     else:
         st.line_chart(gdf.set_index("datetime")["interest"])
 
@@ -202,6 +219,7 @@ if run_btn and keyword.strip():
     ndf, nerr = naver_datalab_searchtrend(keyword)
     if nerr:
         st.info(nerr)
+        ndf = pd.DataFrame()
     else:
         st.line_chart(ndf.set_index("period")["search_ratio"])
 
