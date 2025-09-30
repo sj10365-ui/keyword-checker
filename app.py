@@ -22,7 +22,7 @@ NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 st.markdown("""
 <style>
 /* 전체 컨테이너 폭/여백 조정 */
-.block-container { max-width: 1200px; padding-top: 12px; }
+.block-container { max-width: 1200px; padding-top: 36px !important; }
 /* 섹션 카드 스타일 */
 .section-card { border:1px solid #e5e7eb; border-radius:16px; padding:18px 18px; background:#fafafa; }
 .section-title { margin:0 0 10px 0; font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px; }
@@ -36,8 +36,8 @@ st.markdown("""
 
 # ---- Hero ---------------------------------------------------------------------------
 st.markdown("""
-<div style="text-align:center; margin:8px 0 14px 0;">
-  <div style="font-size:34px; font-weight:800;">🔎 키워드 급증 원인 체크</div>
+<div class="hero" style="text-align:center; margin:24px 0 16px 0;">
+  <div style="font-size:34px; font-weight:800;">🔎 키워드 급증 원인 체크(최강콘팀용)</div>
   <div style="color:#6b7280;">YouTube · Google Trends · 네이버 데이터랩</div>
 </div>
 """, unsafe_allow_html=True)
