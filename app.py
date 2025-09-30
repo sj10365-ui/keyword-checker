@@ -309,30 +309,18 @@ if run_btn and keyword.strip():
     def _extract_trends_url(errmsg: str) -> str | None:
         if not errmsg:
             return None
-        # 단순 파서: 첫 번째 http로 시작하는 토큰을 링크로 간주
         for token in errmsg.split():
             if token.startswith("http://") or token.startswith("https://"):
                 return token.strip()
         return None
 
     if gerr:
-        st.info(gerr)  # 에러 메시지(원인 표시 + 링크 포함)
+        st.info(gerr)  # 에러 메시지(429 등 원인 + 링크 안내 포함)
 
         trends_url = _extract_trends_url(gerr)
         if trends_url:
-            colA, colB = st.columns(2)
-            with colA:
-                st.link_button("🔗 Google Trends 열기", trends_url)
-            with colB:
-                st.code(trends_url, language="text")
-
-            # (참고) Google Trends는 대부분 iframe 임베드가 차단됨.
-            # 그래도 시도해보고, 실패 시 안내 문구 노출
-            with st.expander("앱 안에서 미리보기(실패할 수 있음)"):
-                try:
-                    components.iframe(trends_url, height=600)
-                except Exception:
-                    st.warning("이 페이지는 보안 정책으로 임베드가 차단됩니다. 위 링크 버튼을 사용해 주세요.")
+            st.link_button("🔗 Google Trends 열기", trends_url)
+            st.code(trends_url, language="text")  # 복사용
         gdf = pd.DataFrame()
     else:
         st.line_chart(gdf.set_index("datetime")["interest"])
