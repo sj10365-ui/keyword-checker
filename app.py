@@ -25,6 +25,8 @@ with st.form("controls"):
     keyword = r1c1.text_input("키워드 입력", placeholder="키워드를 입력해주세요")
     hours_window = r1c2.selectbox("윈도우(시간)", [24, 48, 72, 168], index=0)
     region = r1c3.selectbox("지역", ["KR", "US", "JP", "GLOBAL"], index=0)
+    # 폼 블록 안에 하나만 추가
+    broad_mode = c3.checkbox("브로드 모드", value=True, help="제목/설명/태그에 없을 수도 있어 후보를 넓게 탐색")
 
     # 다음 줄: 오른쪽 정렬 버튼
     r2c1, r2c2, r2c3, r2c4 = st.columns([4, 1.2, 1.2, 1.2])
@@ -35,73 +37,113 @@ with st.form("controls"):
 def human_ts(ts: dt.datetime) -> str:
     return ts.strftime("%Y-%m-%d %H:%M")
 
-def youtube_search(keyword: str, api_key: str, hours: int = 24):
-    """최근 hours 내 업로드된 유튜브 영상(숏츠 포함)을 조회하고, 키워드 매칭 여부까지 반환."""
+def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool = True):
     if not api_key:
         return pd.DataFrame(), "환경변수 YOUTUBE_API_KEY가 없습니다."
 
+    # ① 키워드 변형 사전
+    def variants(kw: str):
+        base = kw.strip()
+        no_space = base.replace(" ", "")
+        v = {
+            base, no_space,
+            f"#{base}", f"#{no_space}",
+            # 로마자/일문 변형 예시 (필요에 맞게 추가)
+            "saeng baekseju", "saengbaekseju",
+            "생 백세주", "백세주 생",
+        }
+        # 한글 자주 나는 오타(아/어, ㅐ/ㅔ) 등은 상황 맞게 추가
+        return list({x for x in v if x})
+
     published_after = (dt.datetime.utcnow() - dt.timedelta(hours=hours)).isoformat("T") + "Z"
 
-    # 내부 헬퍼: 검색 요청 (지역/언어 힌트 + 최신순)
     def _search_once(q):
-        url = "https://www.googleapis.com/youtube/v3/search"
-        return requests.get(url, params={
-            "part": "snippet",
-            "q": q,
-            "type": "video",
-            "order": "date",
-            "maxResults": 25,
-            "publishedAfter": published_after,
-            "regionCode": "KR",
-            "relevanceLanguage": "ko",
-            "key": api_key,
-        }, timeout=20)
+        return requests.get(
+            "https://www.googleapis.com/youtube/v3/search",
+            params={
+                "part": "snippet", "q": q, "type": "video", "order": "date",
+                "maxResults": 25, "publishedAfter": published_after,
+                "regionCode": "KR", "relevanceLanguage": "ko", "key": api_key,
+            }, timeout=20
+        )
 
-    # 일반 검색 + 해시태그 검색 병합
-    r = _search_once(keyword)
-    r_hash = _search_once(f"#{keyword}")
+    # ② 변형어들로 검색 병합
     items = []
-    if r.status_code == 200:
-        items += r.json().get("items", [])
-    if r_hash.status_code == 200:
-        items += r_hash.json().get("items", [])
+    for q in variants(keyword):
+        r = _search_once(q)
+        if r.status_code == 200:
+            items += r.json().get("items", [])
 
     video_ids = list({it.get("id", {}).get("videoId") for it in items if it.get("id", {}).get("videoId")})
+
+    # ③ 브로드 모드: 키워드 없이 최근 업로드 상위 N개를 후보에 추가
+    if broad_mode:
+        rb = requests.get(
+            "https://www.googleapis.com/youtube/v3/search",
+            params={
+                "part": "snippet", "type": "video", "order": "date",
+                "maxResults": 25, "publishedAfter": published_after,
+                "regionCode": "KR", "relevanceLanguage": "ko", "key": api_key,
+            }, timeout=20
+        )
+        if rb.status_code == 200:
+            items_b = rb.json().get("items", [])
+            video_ids += [it.get("id", {}).get("videoId") for it in items_b if it.get("id", {}).get("videoId")]
+            video_ids = list({v for v in video_ids if v})
+
     if not video_ids:
         return pd.DataFrame(), "최근 업로드 결과 없음"
 
-    # 상세 정보 조회(통계 + 길이로 숏츠 판별)
-    url2 = "https://www.googleapis.com/youtube/v3/videos"
-    params2 = {
-        "part": "statistics,snippet,contentDetails",
-        "id": ",".join(video_ids),
-        "key": api_key,
-    }
-    r2 = requests.get(url2, params=params2, timeout=20)
+    # ④ 상세 정보(통계/길이/태그) 조회
+    r2 = requests.get(
+        "https://www.googleapis.com/youtube/v3/videos",
+        params={"part": "statistics,snippet,contentDetails", "id": ",".join(video_ids), "key": api_key},
+        timeout=20,
+    )
     if r2.status_code != 200:
         return pd.DataFrame(), f"YOUTUBE videos 오류: {r2.status_code} {r2.text[:200]}"
 
+    def is_shorts_from_iso(dur_iso):
+        try:
+            return int(isodate.parse_duration(dur_iso).total_seconds()) <= 60
+        except Exception:
+            return False
+
+    # ⑤ 댓글 스캔(옵션): 상위 N개만
+    def comments_mentions(video_id: str, needles: list[str]) -> bool:
+        if not broad_mode:
+            return False
+        try:
+            cr = requests.get(
+                "https://www.googleapis.com/youtube/v3/commentThreads",
+                params={
+                    "part": "snippet", "videoId": video_id, "maxResults": 20,  # 너무 크지 않게
+                    "order": "relevance", "textFormat": "plainText", "key": api_key,
+                }, timeout=20
+            )
+            if cr.status_code != 200:
+                return False
+            arr = cr.json().get("items", [])
+            blob = " ".join([
+                (it.get("snippet", {}).get("topLevelComment", {}).get("snippet", {}).get("textDisplay") or "")
+                for it in arr
+            ]).lower()
+            return any(v.lower() in blob for v in needles)
+        except Exception:
+            return False
+
+    needles = variants(keyword)
     rows = []
     for it in r2.json().get("items", []):
-        stats = it.get("statistics", {}) or {}
         snip = it.get("snippet", {}) or {}
+        stats = it.get("statistics", {}) or {}
         cd = it.get("contentDetails", {}) or {}
-
-        # 길이 → 숏츠 판별
-        duration_iso = cd.get("duration")
-        try:
-            duration_sec = int(isodate.parse_duration(duration_iso).total_seconds()) if duration_iso else None
-        except Exception:
-            duration_sec = None
-        is_shorts = duration_sec is not None and duration_sec <= 60
-
-        # 키워드 메타데이터 매칭(제목/설명/태그)
         title = snip.get("title") or ""
         desc = snip.get("description") or ""
         tags = snip.get("tags", [])
         text_blob = " ".join([title, desc] + tags).lower()
-        kw = keyword.lower()
-        matched_in_meta = (kw in text_blob) or (("#" + kw) in text_blob)
+        matched_in_meta = any(v.lower() in text_blob for v in needles)
+        matched_in_comments = comments_mentions(it.get("id"), needles)
 
         rows.append({
             "videoId": it.get("id"),
@@ -109,9 +151,9 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24):
             "channel": snip.get("channelTitle"),
             "publishedAt": snip.get("publishedAt"),
             "viewCount": int(stats.get("viewCount", 0)) if stats.get("viewCount") else 0,
-            "durationSec": duration_sec,
-            "isShorts": is_shorts,
+            "isShorts": is_shorts_from_iso(cd.get("duration")),
             "matchedInMeta": matched_in_meta,
+            "matchedInComments": matched_in_comments,
             "url": f"https://www.youtube.com/watch?v={it.get('id')}"
         })
 
