@@ -1,5 +1,5 @@
 streamlit==1.37.1
 pandas==2.2.3
 requests==2.32.3
-pytrends==4.9.2
 isodate==0.6.1
+pytrends==4.9.2; python_version < "3.13"
