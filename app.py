@@ -4,6 +4,7 @@ import datetime as dt
 import requests
 import pandas as pd
 import streamlit as st
+import json
 
 # ---- Config ----
 st.set_page_config(page_title="키워드 급증 원인 체크", layout="centered")
