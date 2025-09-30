@@ -86,7 +86,7 @@ with st.form("controls"):
 
     opt1, opt2, opt3, opt4 = st.columns([2, 2, 2, 2])
     with opt1:
-        broad_mode = st.checkbox("브로드 모드", value=default_broad,
+        broad_mode = st.checkbox("브로드 모드", value=false,
                                  help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색")
 
 # 실행 직후 URL 업데이트 + 자동 실행 플래그
@@ -111,7 +111,7 @@ def _yt_request(url: str, params: dict, label: str):
     except Exception as e:
         return None, f"{label} 요청 실패: {e}"
 
-def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool = True):
+def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool = False):
     if not api_key:
         return pd.DataFrame(), "환경변수 YOUTUBE_API_KEY가 없습니다."
 
