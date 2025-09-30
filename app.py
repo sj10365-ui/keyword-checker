@@ -18,25 +18,27 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 
-# ---- Global small CSS polish ---------------------------------------------------------
+# ---- Global CSS ----------------------------------------------------------------------
 st.markdown("""
 <style>
 /* 전체 컨테이너 폭/여백 조정 */
 .block-container { max-width: 1200px; padding-top: 36px !important; }
+
 /* 섹션 카드 스타일 */
 .section-card { border:1px solid #e5e7eb; border-radius:16px; padding:18px 18px; background:#fafafa; }
 .section-title { margin:0 0 10px 0; font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px; }
-/* 유튜브 Top 카드(기존 스타일 남겨둠) */
+
+/* (기존) 유튜브 카드 */
 .vid-card { border:1px solid #e5e7eb; border-radius:12px; padding:12px; background:white; }
 .vid-meta { color:#6b7280; font-size:13px; margin-top:4px; }
 .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #e5e7eb; background:#f3f4f6; }
 .link { text-decoration:none; }
 
-/* 추가: TOP3 카드 예쁘게 */
+/* TOP3 카드 개선 */
 .yt-card{
   border-radius:12px; background:white; padding:12px;
   box-shadow:0 2px 8px rgba(0,0,0,.06); border:1px solid #eef2f7;
-  display:flex; flex-direction:column; gap:10px; min-height:300px;
+  display:flex; flex-direction:column; gap:10px; min-height:320px;
 }
 .yt-head{display:flex; align-items:center; gap:8px;}
 .yt-rank{
@@ -48,15 +50,19 @@ st.markdown("""
 .yt-title{
   font-weight:700; font-size:15px; line-height:1.35;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  word-break: keep-all;
 }
 .yt-thumb{
   width:100%; height:150px; object-fit:cover; border-radius:8px; border:1px solid #f1f5f9;
 }
-.yt-meta{font-size:12px; color:#6b7280;}
+.yt-meta{font-size:12px; color:#6b7280; line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .badge-green{background:#dcfce7;color:#166534;font-size:11px;padding:2px 8px;border-radius:999px;display:inline-block}
 .badge-blue{background:#dbeafe;color:#1e40af;font-size:11px;padding:2px 8px;border-radius:999px;display:inline-block;margin-left:4px}
 .yt-link{font-size:12px; color:#2563eb; text-decoration:none}
-.divider-space{height:18px}
+.divider-space{height:26px}
+
+/* 컬럼 간격(보수적 패치) */
+[data-testid="column"] { padding-right: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,9 +132,14 @@ if run_btn or auto_run:
         "r": region,
         "b": "1" if broad_mode else "0",
     })
+    # (선택) 현재 URL 노출해서 복사 쉽게
+    try:
+        st.code(st.experimental_get_url(), language=None)
+    except Exception:
+        pass
 
 # --------------------------------------------------------------------------------------
-# Helpers
+# Helpers (+ cache)
 # --------------------------------------------------------------------------------------
 def _yt_request(url: str, params: dict, label: str):
     try:
@@ -139,6 +150,7 @@ def _yt_request(url: str, params: dict, label: str):
     except Exception as e:
         return None, f"{label} 요청 실패: {e}"
 
+@st.cache_data(ttl=600)
 def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool = False):
     if not api_key:
         return pd.DataFrame(), "환경변수 YOUTUBE_API_KEY가 없습니다."
@@ -221,8 +233,8 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
         ).lower()
         return any(v.lower() in blob for v in needles)
 
-    needles = variants(keyword)
     rows = []
+    needles = variants(keyword)
     for it in data2.get("items", []):
         snip = it.get("snippet", {}) or {}
         stats = it.get("statistics", {}) or {}
@@ -248,6 +260,7 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
 
     return pd.DataFrame(rows).sort_values("viewCount", ascending=False), None
 
+@st.cache_data(ttl=600)
 def google_trends_pytrends(keyword: str, region: str):
     geo = "" if region == "GLOBAL" else region
     try:
@@ -268,6 +281,7 @@ def google_trends_pytrends(keyword: str, region: str):
         trends_url = f"https://trends.google.com/trends/explore?geo={web_geo}&q={q}"
         return pd.DataFrame(), trends_url  # 에러 문구 대신 URL만
 
+@st.cache_data(ttl=600)
 def naver_datalab_searchtrend(keyword: str):
     if not (NAVER_CLIENT_ID and NAVER_CLIENT_SECRET):
         return pd.DataFrame(), "NAVER_CLIENT_ID/SECRET 환경변수가 없습니다."
@@ -296,6 +310,7 @@ def naver_datalab_searchtrend(keyword: str):
     df["period"] = pd.to_datetime(df["period"])
     return df.rename(columns={"ratio": "search_ratio"}), None
 
+# ---- Scoring -------------------------------------------------------------------------
 def make_judgement(youtube_df, trends_df, naver_df):
     score, reasons = 0, []
     # YouTube
@@ -353,7 +368,7 @@ def render_scored_summary(score: int, verdict: str, reasons: list[str]):
     </div>
     """, unsafe_allow_html=True)
 
-# ---- Small section wrapper -----------------------------------------------------------
+# ---- Section wrapper -----------------------------------------------------------------
 def section_card(title_html: str, body_render_fn):
     st.markdown(f'<div class="section-card"><div class="section-title">{title_html}</div>', unsafe_allow_html=True)
     body_render_fn()
@@ -373,15 +388,29 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
         with st.spinner("YouTube 데이터 수집 중..."):
             ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
         if yerr:
-            st.info(yerr); return pd.DataFrame()
+            if any(x in yerr for x in ["quotaExceeded", "403", "429"]):
+                st.error("YouTube API 쿼터 초과/제한으로 결과를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.")
+            else:
+                st.info(yerr)
+            return pd.DataFrame()
 
         # TOP3
         top3 = ydf.head(3).copy()
 
-        # TOP3 영역 제목
-        st.markdown("#####  TOP 3 영상")
+        # TOP3 제목 + '조회수 기준' 칩
+        st.markdown("##### 🔺 TOP 3 영상")
+        st.markdown(
+            '<div style="margin:-6px 0 8px 0;">'
+            '<span style="display:inline-block;padding:2px 8px;border-radius:999px;'
+            'background:#eef2ff;color:#3730a3;font-size:11px;border:1px solid #e5e7eb;">조회수 기준</span>'
+            '</div>', unsafe_allow_html=True
+        )
 
-        c1, c2, c3 = st.columns(3)
+        # 3열 카드
+        try:
+            c1, c2, c3 = st.columns(3, gap="medium")
+        except TypeError:
+            c1, c2, c3 = st.columns(3)
         cols = [c1, c2, c3]
 
         for i, (_, r) in enumerate(top3.iterrows()):
@@ -389,8 +418,7 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
             cmt_badge  = '<span class="badge-blue">댓글매칭</span>'  if r.get("matchedInComments") else ""
             is_shorts  = "숏츠" if r.get("isShorts") else "일반"
             view_txt   = f"{int(r.get('viewCount',0)):,}회"
-            # 정적 썸네일 URL(추가 API 소모 없음)
-            thumb_url  = f"https://i.ytimg.com/vi/{r.get('videoId','')}/hqdefault.jpg"
+            thumb_url  = f"https://i.ytimg.com/vi/{r.get('videoId','')}/hqdefault.jpg"  # 추가 API 소모 없음
 
             with cols[i]:
                 st.markdown(f"""
@@ -408,19 +436,23 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
                 </div>
                 """, unsafe_allow_html=True)
 
-        # TOP3와 전체 목록 사이 간격 + 얇은 구분선
+        # 간격 + 구분선
         st.markdown('<div class="divider-space"></div><hr style="border:none;height:1px;background:#eef2f7;">',
                     unsafe_allow_html=True)
 
-        # 전체 목록 (깔끔한 표)
+        # 전체 목록 (깔끔 포맷)
         st.markdown("###### 전체 목록")
-
         df_show = ydf[["title","channel","viewCount","durationSec","isShorts",
                        "matchedInMeta","matchedInComments","publishedAt","url"]].rename(columns={
             "title":"제목","channel":"채널","viewCount":"조회수","durationSec":"길이(초)",
             "isShorts":"숏츠","matchedInMeta":"메타","matchedInComments":"댓글",
             "publishedAt":"업로드","url":"링크"
         })
+        # 업로드 시각 포맷
+        try:
+            df_show["업로드"] = pd.to_datetime(df_show["업로드"]).dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pass
 
         try:
             st.dataframe(
@@ -436,7 +468,6 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
                 },
             )
         except Exception:
-            # 구버전 Streamlit 호환
             st.dataframe(df_show, use_container_width=True, hide_index=True)
 
         return ydf
