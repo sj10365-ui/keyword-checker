@@ -35,7 +35,7 @@ with st.form("controls"):
     # 2) 컨트롤 + 버튼 줄 (같은 baseline)
     c1, c2, c3, c4 = st.columns([4, 1.2, 1.2, 1.2])
     keyword = c1.text_input("", placeholder="키워드를 입력해주세요", label_visibility="collapsed")
-    hours_window = c2.selectbox("", [24, 48, 72, 168], index=0, label_visibility="collapsed")
+    hours_window = c2.selectbox("", [24, 48, 72, 168], index=3, label_visibility="collapsed")
     region = c3.selectbox("", ["KR", "US", "JP", "GLOBAL"], index=0, label_visibility="collapsed")
     run_btn = c4.form_submit_button("분석 실행", use_container_width=True, type="primary")
 
