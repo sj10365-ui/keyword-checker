@@ -365,7 +365,7 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
 
     st.markdown(f"**키워드:** `{keyword}` &nbsp;·&nbsp; **윈도우:** 최근 {hours_window}시간 &nbsp;·&nbsp; **지역:** {region}")
 
- # -------------------- YouTube --------------------
+# -------------------- YouTube --------------------
 def _yt_body():
     with st.spinner("YouTube 데이터 수집 중..."):
         ydf, yerr = youtube_search(keyword, YOUTUBE_API_KEY, hours_window, broad_mode=broad_mode)
@@ -411,6 +411,7 @@ def _yt_body():
                     "matchedInMeta","matchedInComments","publishedAt","url"]
     st.dataframe(ydf[cols_to_show])
     return ydf
+
 
 yt_df = None
 section_card('<span style="color:#ef4444;">🟥 YouTube</span>', lambda: None)
