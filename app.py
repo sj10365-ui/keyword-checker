@@ -353,21 +353,28 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
         c1, c2, c3 = st.columns(3)
         cols = [c1, c2, c3]
         for i, (_, r) in enumerate(top3.iterrows()):
-            with cols[i]:
-                st.markdown(f"""
-                <div class="vid-card">
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <div class="badge">#{i+1}</div>
-                    <div style="font-weight:700; line-height:1.2;">{r['title']}</div>
-                  </div>
-                  <div class="vid-meta">채널 {r['channel']} · 조회수 {r['viewCount']:,} · {'숏츠' if r['isShorts'] else '일반'}</div>
-                  <div style="margin-top:8px;">
-                    <a class="link" target="_blank" href="{r['url']}">🔗 영상 바로가기</a>
-                    {"&nbsp;&nbsp;·&nbsp;&nbsp;✅ 메타매칭" if r['matchedInMeta'] else ""}
-                    {"&nbsp;&nbsp;·&nbsp;&nbsp;💬 댓글매칭" if r['matchedInComments'] else ""}
-                  </div>
+          with cols[i]:
+              meta_badge = (
+                  '<span style="background:#dcfce7; color:#166534; font-size:11px; padding:2px 8px; border-radius:999px; margin-right:4px;">메타매칭</span>'
+                  if r["matchedInMeta"] else ""
+              )
+              comment_badge = (
+                  '<span style="background:#dbeafe; color:#1e40af; font-size:11px; padding:2px 8px; border-radius:999px;">댓글매칭</span>'
+                  if r["matchedInComments"] else ""
+              )
+              st.markdown(f"""
+              <div style="border-radius:12px; background:white; padding:16px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+                <div style="font-size:12px; color:#9ca3af; margin-bottom:6px;">#{i+1}</div>
+                <div style="font-weight:700; font-size:15px; line-height:1.3; margin-bottom:6px;">
+                  {r['title']}
                 </div>
-                """, unsafe_allow_html=True)
+                <div style="font-size:12px; color:#6b7280; margin-bottom:8px;">
+                  👤 {r['channel']} &nbsp;·&nbsp; 👁 {r['viewCount']:,}회 &nbsp;·&nbsp; 🎬 {'숏츠' if r['isShorts'] else '일반'}
+                </div>
+                <div style="margin-bottom:10px;">{meta_badge}{comment_badge}</div>
+                <a href="{r['url']}" target="_blank" style="font-size:12px; text-decoration:none; color:#2563eb;">🔗 영상 바로가기</a>
+              </div>
+              """, unsafe_allow_html=True)
 
         st.markdown("###### 전체 목록")
         st.dataframe(ydf[["title","channel","viewCount","durationSec","isShorts","matchedInMeta","matchedInComments","publishedAt","url"]])
