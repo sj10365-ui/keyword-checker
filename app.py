@@ -306,24 +306,31 @@ if run_btn and keyword.strip():
     st.markdown("### 🟨 Google Trends (최근 7일)")
     gdf, gerr = google_trends_pytrends(keyword, region)
 
-    def _extract_trends_url(errmsg: str) -> str | None:
-        if not errmsg:
-            return None
-        for token in errmsg.split():
-            if token.startswith("http://") or token.startswith("https://"):
-                return token.strip()
-        return None
+    import urllib.parse
+
+    def _build_trends_url(keyword: str, region: str, fallback_from_err: str | None = None) -> str:
+        # 에러 문자열 안에 링크가 있으면 그걸 우선 사용
+        if fallback_from_err:
+            for tok in fallback_from_err.split():
+                if tok.startswith("http://") or tok.startswith("https://"):
+                    return tok.strip()
+        # 없으면 직접 구성
+        geo = "" if region == "GLOBAL" else region or "KR"
+        q = urllib.parse.quote(keyword)
+        web_geo = geo or "KR"
+        return f"https://trends.google.com/trends/explore?geo={web_geo}&q={q}"
 
     if gerr:
-        st.info(gerr)  # 에러 메시지(429 등 원인 + 링크 안내 포함)
-
-        trends_url = _extract_trends_url(gerr)
-        if trends_url:
-            st.link_button("🔗 Google Trends 열기", trends_url)
-            st.code(trends_url, language="text")  # 복사용
+        # 에러 문구는 숨기고 버튼만 노출
+        trends_url = _build_trends_url(keyword, region, gerr)
+        st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
+        st.caption("일시적 제한으로 내부 차트를 생략했습니다.")
         gdf = pd.DataFrame()
     else:
         st.line_chart(gdf.set_index("datetime")["interest"])
+        # 차트가 떠도 외부 페이지 버튼 하나는 항상 제공(선택)
+        trends_url = _build_trends_url(keyword, region, None)
+        st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
 
     # Naver DataLab
     st.markdown("### 🟩 네이버 데이터랩 (최근 2주)")
