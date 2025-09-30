@@ -86,7 +86,7 @@ with st.form("controls"):
 
     opt1, opt2, opt3, opt4 = st.columns([2, 2, 2, 2])
     with opt1:
-        broad_mode = st.checkbox("브로드 모드", value=broad_mode,
+        broad_mode = st.checkbox("브로드 모드", value=defalut_False,
                                  help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색")
 
 # 실행 직후 URL 업데이트 + 자동 실행 플래그
