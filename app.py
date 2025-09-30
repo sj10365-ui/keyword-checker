@@ -413,10 +413,10 @@ def _yt_body():
     return ydf
 
 
-yt_df = None
-section_card('<span style="color:#ef4444;">🟥 YouTube</span>', lambda: None)
-# 바로 아래에서 실제 내용 렌더링
-yt_df = _yt_body()
+    yt_df = None
+    section_card('<span style="color:#ef4444;">🟥 YouTube</span>', lambda: None)
+    # 바로 아래에서 실제 내용 렌더링
+    yt_df = _yt_body()
 
     # -------------------- Google Trends --------------------
     def _trends_body():
