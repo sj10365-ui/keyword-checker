@@ -110,7 +110,7 @@ def google_trends_pytrends(keyword: str, region: str):
         return pd.DataFrame(), f"Google Trends 오류: {e}"
 
 def naver_datalab_searchtrend(keyword: str):
-    """네이버 데이터랩 검색어 트렌드(최근 2주, 일 단위). device 필드 제거(전체 집계)."""
+    """네이버 데이터랩 검색어 트렌드(최근 2주, 일 단위). device는 'pc'로 명시."""
     if not (NAVER_CLIENT_ID and NAVER_CLIENT_SECRET):
         return pd.DataFrame(), "NAVER_CLIENT_ID/SECRET 환경변수가 없습니다."
     url = "https://openapi.naver.com/v1/datalab/search"
@@ -122,26 +122,38 @@ def naver_datalab_searchtrend(keyword: str):
     today = dt.date.today()
     start_date = (today - dt.timedelta(days=14)).strftime("%Y-%m-%d")
     end_date = (today - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+
     body = {
         "startDate": start_date,
         "endDate": end_date,
         "timeUnit": "date",
-        "keywordGroups": [
-            {"groupName": keyword, "keywords": [keyword]}
-        ]
-        # device 제거(전체), 모바일만: "device": "mo", PC만: "device": "pc"
+        "keywordGroups": [{"groupName": keyword, "keywords": [keyword]}],
+        "device": "pc"   # 허용값: 'pc' 또는 'mo'
     }
-    r = requests.post(url, headers=headers, data=json.dumps(body), timeout=20)
+
+    try:
+        r = requests.post(url, headers=headers, data=json.dumps(body), timeout=20)
+    except Exception as e:
+        return pd.DataFrame(), f"Naver DataLab 요청 실패: {e}"
+
     if r.status_code != 200:
-        return pd.DataFrame(), f"Naver DataLab 오류: {r.status_code} {r.text[:200]}"
-    res = r.json()
+        # 에러 본문을 그대로 보여줘서 디버깅 쉽게
+        return pd.DataFrame(), f"Naver DataLab 오류: {r.status_code} {r.text}"
+
+    try:
+        res = r.json()
+    except Exception:
+        return pd.DataFrame(), f"Naver DataLab 응답 파싱 실패: {r.text[:200]}"
+
     results = res.get("results", [])
     if not results:
-        return pd.DataFrame(), "결과 없음"
+        return pd.DataFrame(), "Naver DataLab 결과 없음"
+
     data = results[0].get("data", [])
     df = pd.DataFrame(data)
     if df.empty:
-        return pd.DataFrame(), "결과 없음"
+        return pd.DataFrame(), "Naver DataLab 결과 없음"
+
     df["period"] = pd.to_datetime(df["period"])
     df = df.rename(columns={"ratio": "search_ratio"})
     return df, None
