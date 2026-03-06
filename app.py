@@ -1,4 +1,5 @@
 import os
+import re
 import html
 import json
 import time
@@ -311,8 +312,40 @@ def naver_datalab_searchtrend(keyword: str):
     df["period"] = pd.to_datetime(df["period"])
     return df.rename(columns={"ratio": "search_ratio"}), None
 
+@st.cache_data(ttl=300)
+def naver_search(keyword: str, search_type: str, hours: int = 168):
+    """search_type: 'news' | 'cafearticle'"""
+    if not (NAVER_CLIENT_ID and NAVER_CLIENT_SECRET):
+        return pd.DataFrame(), "NAVER_CLIENT_ID/SECRET 환경변수가 없습니다."
+    url = f"https://openapi.naver.com/v1/search/{search_type}.json"
+    headers = {
+        "X-Naver-Client-Id": NAVER_CLIENT_ID,
+        "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
+    }
+    params = {"query": keyword, "display": 20, "sort": "date"}
+    try:
+        r = requests.get(url, headers=headers, params=params, timeout=20)
+        if r.status_code != 200:
+            return pd.DataFrame(), f"Naver {search_type} 오류: {r.status_code} {r.text[:200]}"
+        items = r.json().get("items", [])
+        if not items:
+            return pd.DataFrame(), "결과 없음"
+        df = pd.DataFrame(items)
+        df["pubDate"] = pd.to_datetime(df["pubDate"], format="%a, %d %b %Y %H:%M:%S %z", utc=True)
+        cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
+        df = df[df["pubDate"] >= cutoff]
+        if df.empty:
+            return pd.DataFrame(), f"최근 {hours}시간 내 결과 없음"
+        # API 응답 title/description에 <b> 태그 포함 → 제거
+        for col in ["title", "description"]:
+            if col in df.columns:
+                df[col] = df[col].apply(lambda x: re.sub(r"<[^>]+>", "", x or ""))
+        return df.sort_values("pubDate", ascending=False).reset_index(drop=True), None
+    except Exception as e:
+        return pd.DataFrame(), f"Naver {search_type} 요청 실패: {e}"
+
 # ---- Scoring -------------------------------------------------------------------------
-def make_judgement(youtube_df, trends_df, naver_df):
+def make_judgement(youtube_df, trends_df, naver_df, news_df=None, cafe_df=None):
     score, reasons = 0, []
     # YouTube
     if isinstance(youtube_df, pd.DataFrame) and not youtube_df.empty:
@@ -329,7 +362,7 @@ def make_judgement(youtube_df, trends_df, naver_df):
         lift = last / med
         if lift >= 1.5 and last >= 20:
             score += 1; reasons.append(f"Google Trends 상승 (x{lift:.1f})")
-    # Naver
+    # Naver DataLab
     if isinstance(naver_df, pd.DataFrame) and not naver_df.empty:
         naver_df = naver_df.sort_values("period")
         if len(naver_df) >= 10:
@@ -337,27 +370,35 @@ def make_judgement(youtube_df, trends_df, naver_df):
             prev = naver_df.tail(10).head(7)["search_ratio"].mean()
             if prev and prev > 0 and (recent / prev) >= 1.3:
                 score += 1; reasons.append("네이버 데이터랩 상승")
-    if score >= 3: verdict = "복합 외부 요인 가능성 높음"
+    # Naver 뉴스
+    if isinstance(news_df, pd.DataFrame) and not news_df.empty:
+        score += 1; reasons.append(f"네이버 뉴스 보도 감지 ({len(news_df)}건)")
+    # Naver 카페
+    if isinstance(cafe_df, pd.DataFrame) and not cafe_df.empty:
+        score += 1; reasons.append(f"네이버 카페 커뮤니티 확산 감지 ({len(cafe_df)}건)")
+    if score >= 4: verdict = "복합 외부 요인 가능성 높음"
+    elif score == 3: verdict = "복합 채널 영향 가능"
     elif score == 2: verdict = "단일 채널 영향 가능"
     elif score == 1: verdict = "미약한 외부 신호"
     else: verdict = "외부 신호 증거 부족 (내부 요인/우연 가능)"
     return verdict, reasons, score
 
 def _score_theme(score: int):
-    if score >= 3: return {"emoji":"🔥","title":"복합 외부 요인 폭발","color":"#ef4444"}
-    if score == 2: return {"emoji":"🟧","title":"단일 채널 영향","color":"#f97316"}
-    if score == 1: return {"emoji":"🟨","title":"약한 외부 신호","color":"#eab308"}
+    if score >= 4: return {"emoji":"🔥","title":"복합 외부 요인 폭발","color":"#ef4444"}
+    if score == 3: return {"emoji":"🟧","title":"복합 채널 영향","color":"#f97316"}
+    if score == 2: return {"emoji":"🟨","title":"단일 채널 영향","color":"#eab308"}
+    if score == 1: return {"emoji":"🟦","title":"약한 외부 신호","color":"#3b82f6"}
     return {"emoji":"🟩","title":"외부 신호 없음","color":"#22c55e"}
 
 def render_scored_summary(score: int, verdict: str, reasons: list[str]):
     theme = _score_theme(score)
-    frac = max(0, min(score, 4)) / 4
+    frac = max(0, min(score, 6)) / 6
     st.markdown(f"""
     <div style="border:1px solid {theme['color']}; border-radius:16px; padding:16px 18px; margin:8px 0; background:white;">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
         <span style="font-size:22px;">{theme['emoji']}</span>
         <div style="font-weight:800; font-size:18px;">{theme['title']}</div>
-        <div style="margin-left:auto; font-size:13px; opacity:.8;">스코어 <b>{score}</b> / 4</div>
+        <div style="margin-left:auto; font-size:13px; opacity:.8;">스코어 <b>{score}</b> / 6</div>
       </div>
       <div style="height:8px; width:100%; background:#e5e7eb; border-radius:999px; overflow:hidden; margin:6px 0 12px;">
         <div style="height:100%; width:{frac*100:.0f}%; background:{theme['color']};"></div>
@@ -510,9 +551,52 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
     nv_df = _naver_body()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # -------------------- Naver 뉴스 --------------------
+    def _news_body():
+        with st.spinner("네이버 뉴스 검색 중..."):
+            nws_df, nws_err = naver_search(keyword, "news", hours_window)
+        if nws_err:
+            st.info(nws_err); return pd.DataFrame()
+        st.caption(f"최근 {hours_window}시간 내 {len(nws_df)}건")
+        for _, row in nws_df.head(5).iterrows():
+            pub = row["pubDate"].strftime("%m/%d %H:%M")
+            title_safe = html.escape(row.get("title", ""))
+            desc_safe  = html.escape((row.get("description") or "")[:120])
+            link = row.get("originallink") or row.get("link", "")
+            st.markdown(f"**[{title_safe}]({link})** &nbsp;<span style='color:#6b7280;font-size:12px;'>{pub}</span>", unsafe_allow_html=True)
+            if desc_safe:
+                st.caption(desc_safe)
+        return nws_df
+
+    st.markdown('<div class="section-card"><div class="section-title" style="color:#0f172a;">📰 네이버 뉴스</div>', unsafe_allow_html=True)
+    nws_df = _news_body()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # -------------------- Naver 카페 --------------------
+    def _cafe_body():
+        with st.spinner("네이버 카페 검색 중..."):
+            caf_df, caf_err = naver_search(keyword, "cafearticle", hours_window)
+        if caf_err:
+            st.info(caf_err); return pd.DataFrame()
+        st.caption(f"최근 {hours_window}시간 내 {len(caf_df)}건")
+        for _, row in caf_df.head(5).iterrows():
+            pub = row["pubDate"].strftime("%m/%d %H:%M")
+            title_safe   = html.escape(row.get("title", ""))
+            cafe_safe    = html.escape(row.get("cafename", ""))
+            desc_safe    = html.escape((row.get("description") or "")[:120])
+            link = row.get("link", "")
+            st.markdown(f"**[{title_safe}]({link})** &nbsp;<span style='color:#6b7280;font-size:12px;'>{cafe_safe} · {pub}</span>", unsafe_allow_html=True)
+            if desc_safe:
+                st.caption(desc_safe)
+        return caf_df
+
+    st.markdown('<div class="section-card"><div class="section-title" style="color:#7c3aed;">☕ 네이버 카페</div>', unsafe_allow_html=True)
+    caf_df = _cafe_body()
+    st.markdown('</div>', unsafe_allow_html=True)
+
     # -------------------- Summary Card --------------------
     st.markdown("---")
-    verdict, reasons, score = make_judgement(yt_df, tr_df, nv_df)
+    verdict, reasons, score = make_judgement(yt_df, tr_df, nv_df, nws_df, caf_df)
     render_scored_summary(score, verdict, reasons)
     st.caption("※ 자동 추정 결과이며, 실제 원인은 추가 확인이 필요할 수 있습니다.")
 
