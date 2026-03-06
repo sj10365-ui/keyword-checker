@@ -1,4 +1,5 @@
 import os
+import html
 import json
 import time
 import random
@@ -158,8 +159,7 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
     def variants(kw: str):
         base = (kw or "").strip()
         no_space = base.replace(" ", "")
-        v = {base, no_space, f"#{base}", f"#{no_space}",
-             "saeng baekseju", "saengbaekseju", "생 백세주", "백세주 생"}
+        v = {base, no_space, f"#{base}", f"#{no_space}"}
         return [x for x in v if x]
 
     published_after = (
@@ -233,8 +233,10 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
         ).lower()
         return any(v.lower() in blob for v in needles)
 
+    MAX_COMMENT_CHECKS = 10  # 브로드 모드에서 댓글 API 호출 최대 횟수
     rows = []
     needles = variants(keyword)
+    comment_check_count = 0
     for it in data2.get("items", []):
         snip = it.get("snippet", {}) or {}
         stats = it.get("statistics", {}) or {}
@@ -244,7 +246,12 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
         tags = snip.get("tags", [])
         text_blob = " ".join([title, desc] + (tags or [])).lower()
         matched_in_meta = any(v.lower() in text_blob for v in needles)
-        matched_in_comments = comments_mentions(it.get("id"), needles)
+        if comment_check_count < MAX_COMMENT_CHECKS:
+            matched_in_comments = comments_mentions(it.get("id"), needles)
+            if broad_mode:
+                comment_check_count += 1
+        else:
+            matched_in_comments = False
         rows.append({
             "videoId": it.get("id"),
             "title": title,
@@ -420,17 +427,19 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
             view_txt   = f"{int(r.get('viewCount',0)):,}회"
             thumb_url  = f"https://i.ytimg.com/vi/{r.get('videoId','')}/hqdefault.jpg"  # 추가 API 소모 없음
 
+            safe_title   = html.escape(r.get('title', ''))
+            safe_channel = html.escape(r.get('channel', ''))
             with cols[i]:
                 st.markdown(f"""
                 <div class="yt-card">
                   <div class="yt-head">
                     <div class="yt-rank">{i+1}</div>
-                    <div class="yt-title">{r.get('title','')}</div>
+                    <div class="yt-title">{safe_title}</div>
                   </div>
                   <a href="{r.get('url','')}" target="_blank" aria-label="영상 바로가기">
                     <img class="yt-thumb" src="{thumb_url}">
                   </a>
-                  <div class="yt-meta">👤 {r.get('channel','')} &nbsp;·&nbsp; 👁 {view_txt} &nbsp;·&nbsp; 🎬 {is_shorts}</div>
+                  <div class="yt-meta">👤 {safe_channel} &nbsp;·&nbsp; 👁 {view_txt} &nbsp;·&nbsp; 🎬 {is_shorts}</div>
                   <div>{meta_badge}{cmt_badge}</div>
                   <a class="yt-link" target="_blank" href="{r.get('url','')}">🔗 영상 바로가기</a>
                 </div>
@@ -472,9 +481,9 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
 
         return ydf
 
-    yt_df = None
-    section_card('<span style="color:#ef4444;">🟥 YouTube</span>', lambda: None)
+    st.markdown('<div class="section-card"><div class="section-title" style="color:#ef4444;">🟥 YouTube</div>', unsafe_allow_html=True)
     yt_df = _yt_body()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # -------------------- Google Trends --------------------
     def _trends_body():
