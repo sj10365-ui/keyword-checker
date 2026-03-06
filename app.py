@@ -331,11 +331,14 @@ def naver_search(keyword: str, search_type: str, hours: int = 168):
         if not items:
             return pd.DataFrame(), "결과 없음"
         df = pd.DataFrame(items)
-        df["pubDate"] = pd.to_datetime(df["pubDate"], format="%a, %d %b %Y %H:%M:%S %z", utc=True)
-        cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
-        df = df[df["pubDate"] >= cutoff]
-        if df.empty:
-            return pd.DataFrame(), f"최근 {hours}시간 내 결과 없음"
+        if "pubDate" in df.columns:
+            df["pubDate"] = pd.to_datetime(df["pubDate"], format="%a, %d %b %Y %H:%M:%S %z", utc=True, errors="coerce")
+            cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
+            df = df[df["pubDate"] >= cutoff]
+            if df.empty:
+                return pd.DataFrame(), f"최근 {hours}시간 내 결과 없음"
+        else:
+            df["pubDate"] = pd.NaT  # 날짜 없는 API (카페글 등)
         # API 응답 title/description에 <b> 태그 포함 → 제거
         for col in ["title", "description"]:
             if col in df.columns:
@@ -559,7 +562,7 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
             st.info(nws_err); return pd.DataFrame()
         st.caption(f"최근 {hours_window}시간 내 {len(nws_df)}건")
         for _, row in nws_df.head(5).iterrows():
-            pub = row["pubDate"].strftime("%m/%d %H:%M")
+            pub = row["pubDate"].strftime("%m/%d %H:%M") if pd.notna(row["pubDate"]) else ""
             title_safe = html.escape(row.get("title", ""))
             desc_safe  = html.escape((row.get("description") or "")[:120])
             link = row.get("originallink") or row.get("link", "")
@@ -580,7 +583,7 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
             st.info(caf_err); return pd.DataFrame()
         st.caption(f"최근 {hours_window}시간 내 {len(caf_df)}건")
         for _, row in caf_df.head(5).iterrows():
-            pub = row["pubDate"].strftime("%m/%d %H:%M")
+            pub = row["pubDate"].strftime("%m/%d %H:%M") if pd.notna(row["pubDate"]) else ""
             title_safe   = html.escape(row.get("title", ""))
             cafe_safe    = html.escape(row.get("cafename", ""))
             desc_safe    = html.escape((row.get("description") or "")[:120])
