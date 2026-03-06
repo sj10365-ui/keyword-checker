@@ -88,7 +88,6 @@ def _get1(d, k, default):
 
 default_keyword = _get1(qp, "q", "")
 h_raw = _get1(qp, "h", "168")
-r_raw = _get1(qp, "r", "KR")
 b_raw = _get1(qp, "b", "0")
 
 hours_options = [24, 48, 72, 168]
@@ -99,25 +98,21 @@ try:
 except:
     default_hours = 168
 
-region_options = ["KR", "US", "JP", "GLOBAL"]
-default_region = r_raw if r_raw in region_options else "KR"
 default_broad = (str(b_raw) == "1")
 
 # --------------------------------------------------------------------------------------
 # Controls (레이블 줄 + 컨트롤 줄)
 # --------------------------------------------------------------------------------------
 with st.form("controls"):
-    lh1, lh2, lh3, lh4 = st.columns([4, 1.2, 1.2, 1.2])
-    lh1.markdown("**키워드 입력**"); lh2.markdown("**탐색 시간**"); lh3.markdown("**지역**"); lh4.markdown("&nbsp;")
+    lh1, lh2, lh3 = st.columns([4, 1.5, 1.2])
+    lh1.markdown("**키워드 입력**"); lh2.markdown("**탐색 시간**"); lh3.markdown("&nbsp;")
 
-    c1, c2, c3, c4 = st.columns([4, 1.2, 1.2, 1.2])
+    c1, c2, c3 = st.columns([4, 1.5, 1.2])
     keyword = c1.text_input("키워드 입력", placeholder="키워드를 입력해주세요",
                             value=default_keyword, label_visibility="collapsed")
     hours_window = c2.selectbox("탐색 시간", hours_options,
                                 index=hours_options.index(default_hours), label_visibility="collapsed")
-    region = c3.selectbox("지역", region_options,
-                          index=region_options.index(default_region), label_visibility="collapsed")
-    run_btn = c4.form_submit_button("분석 실행", use_container_width=True, type="primary")
+    run_btn = c3.form_submit_button("분석 실행", use_container_width=True, type="primary")
 
     opt1, opt2, opt3, opt4 = st.columns([2, 2, 2, 2])
     with opt1:
@@ -130,7 +125,6 @@ if run_btn or auto_run:
     st.query_params.update({
         "q": (keyword or default_keyword or ""),
         "h": str(hours_window),
-        "r": region,
         "b": "1" if broad_mode else "0",
     })
     # (선택) 현재 URL 노출해서 복사 쉽게
@@ -388,7 +382,7 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
     if not (keyword or "").strip():
         keyword = default_keyword
 
-    st.markdown(f"**키워드:** `{keyword}` &nbsp;·&nbsp; **윈도우:** 최근 {hours_window}시간 &nbsp;·&nbsp; **지역:** {region}")
+    st.markdown(f"**키워드:** `{keyword}` &nbsp;·&nbsp; **윈도우:** 최근 {hours_window}시간")
 
     # -------------------- YouTube --------------------
     def _yt_body():
@@ -488,14 +482,14 @@ if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
     # -------------------- Google Trends --------------------
     def _trends_body():
         with st.spinner("Google Trends 로딩 중..."):
-            gdf, gerr = google_trends_pytrends(keyword, region)
+            gdf, gerr = google_trends_pytrends(keyword, "KR")
         if gerr:
-            trends_url = gerr if str(gerr).startswith("http") else f"https://trends.google.com/trends/explore?geo={region or 'KR'}&q={urllib.parse.quote(keyword or '')}"
+            trends_url = gerr if str(gerr).startswith("http") else f"https://trends.google.com/trends/explore?geo=KR&q={urllib.parse.quote(keyword or '')}"
             st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
             st.caption("일시적 제한으로 내부 차트를 생략했습니다.")
             return pd.DataFrame()
         st.line_chart(gdf.set_index("datetime")["interest"])
-        trends_url = f"https://trends.google.com/trends/explore?geo={(region if region!='GLOBAL' else 'KR')}&q={urllib.parse.quote(keyword or '')}"
+        trends_url = f"https://trends.google.com/trends/explore?geo=KR&q={urllib.parse.quote(keyword or '')}"
         st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
         return gdf
 
