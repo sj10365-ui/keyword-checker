@@ -25,85 +25,109 @@ st.markdown("""
 <style>
 /* ===== DAILYSHOT BRAND · LIGHT THEME ===== */
 
-/* 전체 배경 */
-.main, [data-testid="stAppViewContainer"] { background: #f7f8fa; }
-.block-container { max-width: 1100px !important; padding: 28px 32px !important; }
+/* 전체 배경 / 레이아웃 */
+.main, [data-testid="stAppViewContainer"] { background: #f5f6f8; }
+.block-container { max-width: 980px !important; padding: 24px 28px !important; }
+#MainMenu, footer, header { visibility: hidden; }
+[data-testid="stHeader"] { display: none !important; }
+[data-testid="stToolbar"] { display: none !important; }
 
-/* 사이드바 */
-[data-testid="stSidebar"] { background: #ffffff !important; border-right: 1px solid #eef0f2 !important; }
-[data-testid="stSidebar"] section { padding: 20px 16px !important; }
+/* ── 사이드바 ── */
+[data-testid="stSidebar"] {
+  background: #ffffff !important;
+  border-right: 1px solid #e8eaed !important;
+  min-width: 230px !important; max-width: 240px !important;
+}
+[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; }
+[data-testid="stSidebar"] section { padding: 22px 18px !important; }
 
-/* 사이드바 로고 */
+/* 로고 */
 .sidebar-logo {
-  font-size: 17px; font-weight: 800; color: #111; letter-spacing: -0.02em;
-  padding-bottom: 18px; border-bottom: 1px solid #f0f0f0; margin-bottom: 20px;
+  font-size: 16px; font-weight: 900; color: #111; letter-spacing: -0.03em;
+  padding-bottom: 16px; border-bottom: 1px solid #efefef; margin-bottom: 18px;
 }
-.sidebar-logo em { color: #b5c23a; font-style: normal; }
+.sidebar-logo em { color: #FE5000; font-style: normal; }
+
+/* 컨트롤 레이블 */
 .ctrl-label {
-  font-size: 10px; font-weight: 700; color: #aaa;
-  text-transform: uppercase; letter-spacing: 0.09em; margin-bottom: 5px; margin-top: 16px;
+  font-size: 10px; font-weight: 700; color: #b0b4bc;
+  text-transform: uppercase; letter-spacing: 0.10em;
+  margin-bottom: 4px; margin-top: 14px;
 }
 
-/* Primary 버튼 → 데일리샷 브랜드 컬러 */
-[data-testid="stFormSubmitButton"] > button,
-.stButton > button[kind="primary"] {
-  background: #C8D44E !important; color: #111 !important;
+/* 폼 테두리 제거 */
+[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; }
+
+/* 인풋 / 셀렉트 */
+.stTextInput input, .stSelectbox select {
+  border-radius: 8px !important; border: 1.5px solid #e4e6ea !important;
+  background: #fafbfc !important; font-size: 14px !important; color: #111 !important;
+}
+.stTextInput input:focus {
+  border-color: #FE5000 !important;
+  box-shadow: 0 0 0 3px rgba(254,80,0,0.12) !important;
+}
+
+/* 분석 실행 버튼 */
+[data-testid="stFormSubmitButton"] > button {
+  background: #FE5000 !important; color: #fff !important;
   border: none !important; font-weight: 800 !important;
   border-radius: 10px !important; font-size: 14px !important;
-  padding: 12px !important; transition: background 0.15s !important;
+  padding: 12px !important; width: 100% !important;
+  letter-spacing: 0.01em !important;
+  transition: background 0.15s !important; margin-top: 10px !important;
 }
-[data-testid="stFormSubmitButton"] > button:hover { background: #d4df5e !important; }
+[data-testid="stFormSubmitButton"] > button:hover { background: #e04500 !important; }
 
-/* 인풋 포커스 */
-.stTextInput input:focus { border-color: #C8D44E !important; box-shadow: 0 0 0 3px rgba(200,212,78,0.18) !important; }
-
-/* 섹션 카드 */
+/* ── 섹션 카드 ── */
 .section-card {
-  background: #ffffff; border: 1px solid #eef0f2; border-radius: 14px;
-  padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  background: #ffffff; border: 1px solid #e8eaed; border-radius: 12px;
+  padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 .section-title {
-  margin: 0 0 14px 0; font-size: 11px; font-weight: 700; color: #6b7280;
-  display: flex; align-items: center; gap: 7px;
-  text-transform: uppercase; letter-spacing: 0.08em;
+  margin: 0 0 12px 0; font-size: 10px; font-weight: 700; color: #9aa0ab;
+  display: flex; align-items: center; gap: 6px;
+  text-transform: uppercase; letter-spacing: 0.10em;
 }
-.section-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.section-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 
-/* 유튜브 카드 */
+/* ── YouTube 카드 ── */
 .yt-card {
-  border-radius: 12px; background: white; padding: 12px;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.06); border: 1px solid #f0f2f5;
-  display: flex; flex-direction: column; gap: 10px; min-height: 300px;
+  border-radius: 10px; background: #fafbfc; padding: 10px 11px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e8eaed;
+  display: flex; flex-direction: column; gap: 8px;
 }
-.yt-head { display: flex; align-items: flex-start; gap: 8px; }
+.yt-head { display: flex; align-items: flex-start; gap: 7px; }
 .yt-rank {
-  width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
-  background: #C8D44E; color: #111; font-weight: 800; font-size: 11px;
+  width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0;
+  background: #FE5000; color: #fff; font-weight: 900; font-size: 10px;
   display: flex; align-items: center; justify-content: center;
 }
 .yt-title {
-  font-weight: 700; font-size: 14px; line-height: 1.4; color: #111;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  word-break: keep-all;
+  font-weight: 700; font-size: 13px; line-height: 1.45; color: #111;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: keep-all;
 }
-.yt-thumb { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; border: 1px solid #f0f2f5; }
-.yt-meta { font-size: 12px; color: #9ca3af; line-height: 1.4; }
-.badge-green { background: #f0fdf4; color: #15803d; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; display: inline-block; }
-.badge-blue  { background: #eff6ff; color: #1d4ed8; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; display: inline-block; margin-left: 4px; }
-.yt-link { font-size: 12px; color: #9ca3af; text-decoration: none; }
-.divider-space { height: 14px; }
+.yt-thumb {
+  width: 100%; height: 128px; object-fit: cover;
+  border-radius: 7px; border: 1px solid #e8eaed;
+}
+.yt-meta { font-size: 11px; color: #9ca3af; line-height: 1.4; }
+.badge-green { background: #fff7f4; color: #c73d00; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block; border: 1px solid #ffe0d5; }
+.badge-blue  { background: #eff6ff; color: #1d4ed8; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-left: 3px; border: 1px solid #dbeafe; }
+.yt-link { font-size: 11px; color: #bec3cb; text-decoration: none; }
+.divider-space { height: 12px; }
 
-/* 뉴스/카페 리스트 */
-.news-item { padding: 9px 0; border-bottom: 1px solid #f3f4f6; }
+/* ── 뉴스/카페 리스트 ── */
+.news-item { padding: 8px 0; border-bottom: 1px solid #f1f2f4; }
 .news-item:last-child { border-bottom: none; padding-bottom: 0; }
-.news-title { font-size: 13px; font-weight: 600; color: #111; line-height: 1.5; margin-bottom: 3px; }
-.news-meta { font-size: 11px; color: #9ca3af; }
+.news-title { font-size: 13px; font-weight: 600; color: #111; line-height: 1.45; margin-bottom: 2px; }
+.news-meta { font-size: 11px; color: #b0b4bc; }
 
-/* Streamlit 기본 정리 */
-#MainMenu, footer, header { visibility: hidden; }
+/* 기타 정리 */
 .stMarkdown p { margin-bottom: 0 !important; }
-[data-testid="column"] { padding-right: 8px; }
-hr { border-color: #f0f2f5 !important; }
+[data-testid="column"] { padding-right: 6px !important; }
+hr { border-color: #e8eaed !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -134,7 +158,7 @@ default_broad = (str(b_raw) == "1")
 
 # ---- 사이드바 Hero + Controls -------------------------------------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-logo">daily<em>shot</em> 키워드 체커</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-logo">Daily<em>shot</em> 키워드 체커</div>', unsafe_allow_html=True)
     with st.form("controls"):
         st.markdown('<div class="ctrl-label">키워드</div>', unsafe_allow_html=True)
         keyword = st.text_input("키워드", placeholder="키워드를 입력하세요",
@@ -448,7 +472,7 @@ if run_btn and (keyword or "").strip():
 
     st.markdown(f"""
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
-      <span style="background:#C8D44E; color:#111; font-weight:800; font-size:15px;
+      <span style="background:#FE5000; color:#fff; font-weight:800; font-size:15px;
                    padding:5px 14px; border-radius:7px; letter-spacing:-0.01em;">{keyword}</span>
       <span style="color:#9ca3af; font-size:13px;">최근 {hours_window}시간 분석</span>
     </div>
