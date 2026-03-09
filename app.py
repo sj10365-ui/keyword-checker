@@ -604,48 +604,54 @@ if run_btn and (keyword or "").strip():
     nv_df = _naver_body()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # -------------------- Naver 뉴스 --------------------
-    def _news_body():
-        with st.spinner("네이버 뉴스 검색 중..."):
-            nws_df, nws_err = naver_search(keyword, "news", hours_window)
+    # -------------------- Naver 뉴스 + 카페 (2-column) --------------------
+    with st.spinner("네이버 뉴스 · 카페 검색 중..."):
+        nws_df, nws_err = naver_search(keyword, "news", hours_window)
+        caf_df, caf_err = naver_search(keyword, "cafearticle", hours_window)
+
+    nc1, nc2 = st.columns(2, gap="medium")
+
+    with nc1:
+        st.markdown('<div class="section-card"><div class="section-title"><span class="section-dot" style="background:#64748b;"></span> 📰 네이버 뉴스</div>', unsafe_allow_html=True)
         if nws_err:
-            st.info(nws_err); return pd.DataFrame()
-        st.caption(f"최근 {hours_window}시간 내 {len(nws_df)}건")
-        for _, row in nws_df.head(5).iterrows():
-            pub = row["pubDate"].strftime("%m/%d %H:%M") if pd.notna(row["pubDate"]) else ""
-            title_safe = html.escape(row.get("title", ""))
-            desc_safe  = html.escape((row.get("description") or "")[:120])
-            link = row.get("originallink") or row.get("link", "")
-            st.markdown(f"**[{title_safe}]({link})** &nbsp;<span style='color:#6b7280;font-size:12px;'>{pub}</span>", unsafe_allow_html=True)
-            if desc_safe:
-                st.caption(desc_safe)
-        return nws_df
+            st.info(nws_err)
+            nws_df = pd.DataFrame()
+        else:
+            st.caption(f"최근 {hours_window}시간 내 {len(nws_df)}건")
+            for _, row in nws_df.head(5).iterrows():
+                pub = row["pubDate"].strftime("%m/%d %H:%M") if pd.notna(row["pubDate"]) else ""
+                title_safe = html.escape(row.get("title", ""))
+                desc_safe  = html.escape((row.get("description") or "")[:100])
+                link = row.get("originallink") or row.get("link", "")
+                st.markdown(
+                    f'<div class="news-item">'
+                    f'<div class="news-title"><a href="{link}" target="_blank" style="color:#111;text-decoration:none;">{title_safe}</a></div>'
+                    f'<div class="news-meta">{pub}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="section-card"><div class="section-title"><span class="section-dot" style="background:#64748b;"></span> 네이버 뉴스</div>', unsafe_allow_html=True)
-    nws_df = _news_body()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # -------------------- Naver 카페 --------------------
-    def _cafe_body():
-        with st.spinner("네이버 카페 검색 중..."):
-            caf_df, caf_err = naver_search(keyword, "cafearticle", hours_window)
+    with nc2:
+        st.markdown('<div class="section-card"><div class="section-title"><span class="section-dot" style="background:#7c3aed;"></span> ☕ 네이버 카페</div>', unsafe_allow_html=True)
         if caf_err:
-            st.info(caf_err); return pd.DataFrame()
-        st.caption(f"최근 {hours_window}시간 내 {len(caf_df)}건")
-        for _, row in caf_df.head(5).iterrows():
-            pub = row["pubDate"].strftime("%m/%d %H:%M") if pd.notna(row["pubDate"]) else ""
-            title_safe   = html.escape(row.get("title", ""))
-            cafe_safe    = html.escape(row.get("cafename", ""))
-            desc_safe    = html.escape((row.get("description") or "")[:120])
-            link = row.get("link", "")
-            st.markdown(f"**[{title_safe}]({link})** &nbsp;<span style='color:#6b7280;font-size:12px;'>{cafe_safe} · {pub}</span>", unsafe_allow_html=True)
-            if desc_safe:
-                st.caption(desc_safe)
-        return caf_df
-
-    st.markdown('<div class="section-card"><div class="section-title"><span class="section-dot" style="background:#7c3aed;"></span> 네이버 카페</div>', unsafe_allow_html=True)
-    caf_df = _cafe_body()
-    st.markdown('</div>', unsafe_allow_html=True)
+            st.info(caf_err)
+            caf_df = pd.DataFrame()
+        else:
+            st.caption(f"최근 {hours_window}시간 내 {len(caf_df)}건")
+            for _, row in caf_df.head(5).iterrows():
+                pub = row["pubDate"].strftime("%m/%d %H:%M") if pd.notna(row["pubDate"]) else ""
+                title_safe = html.escape(row.get("title", ""))
+                cafe_safe  = html.escape(row.get("cafename", ""))
+                link = row.get("link", "")
+                st.markdown(
+                    f'<div class="news-item">'
+                    f'<div class="news-title"><a href="{link}" target="_blank" style="color:#111;text-decoration:none;">{title_safe}</a></div>'
+                    f'<div class="news-meta">{cafe_safe}{" · " + pub if pub else ""}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # -------------------- Summary Card --------------------
     st.markdown("---")
