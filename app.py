@@ -154,6 +154,9 @@ st.markdown("""
 .stMarkdown p { margin-bottom: 0 !important; }
 [data-testid="column"] { padding-right: 6px !important; }
 hr { border-color: #e8eaed !important; }
+/* 하단 잘림 방지 */
+.block-container { padding-bottom: 80px !important; }
+.main .block-container { overflow: visible !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -703,6 +706,7 @@ if run_btn and (keyword or "").strip():
     verdict, reasons, score = make_judgement(yt_df, tr_df, nv_df, nws_df, caf_df)
     render_scored_summary(score, verdict, reasons)
     st.caption("※ 자동 추정 결과이며, 실제 원인은 추가 확인이 필요할 수 있습니다.")
+    st.markdown("<div style='height:40px'></div>", unsafe_allow_html=True)
 
 else:
     st.write("키워드를 입력하고 **분석 실행**을 눌러주세요.")
