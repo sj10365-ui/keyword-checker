@@ -93,36 +93,62 @@ st.markdown("""
 
 /* ── YouTube 카드 ── */
 .yt-card {
-  border-radius: 10px; background: #fafbfc; padding: 10px 11px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e8eaed;
-  display: flex; flex-direction: column; gap: 8px;
+  border-radius: 10px; background: #fff; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07); border: 1px solid #e8eaed;
+  display: flex; flex-direction: column;
 }
-.yt-head { display: flex; align-items: flex-start; gap: 7px; }
-.yt-rank {
-  width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0;
-  background: #FE5000; color: #fff; font-weight: 900; font-size: 10px;
-  display: flex; align-items: center; justify-content: center;
-}
-.yt-title {
-  font-weight: 700; font-size: 13px; line-height: 1.45; color: #111;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; word-break: keep-all;
+/* 썸네일 영역 — 랭크·조회수 오버레이 */
+.yt-thumb-wrap {
+  display: block; position: relative; width: 100%;
+  aspect-ratio: 16/9; overflow: hidden; background: #eaecef;
 }
 .yt-thumb {
-  width: 100%; height: 128px; object-fit: cover;
-  border-radius: 7px; border: 1px solid #e8eaed;
+  width: 100%; height: 100%; object-fit: cover; display: block;
 }
-.yt-meta { font-size: 11px; color: #9ca3af; line-height: 1.4; }
-.badge-green { background: #fff7f4; color: #c73d00; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block; border: 1px solid #ffe0d5; }
+.yt-rank {
+  position: absolute; top: 8px; left: 8px;
+  width: 22px; height: 22px; border-radius: 5px;
+  background: #FE5000; color: #fff; font-weight: 900; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+}
+.yt-view-overlay {
+  position: absolute; bottom: 7px; right: 7px;
+  background: rgba(0,0,0,0.62); color: #fff; font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px; letter-spacing: 0.01em;
+}
+/* 카드 본문 */
+.yt-body { padding: 11px 12px; display: flex; flex-direction: column; gap: 4px; }
+/* 1순위: 제목 — 굵고 크게 */
+.yt-title {
+  font-weight: 700; font-size: 13px; line-height: 1.5; color: #111;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: keep-all; margin-bottom: 2px;
+}
+/* 2순위: 채널명 — 중간 */
+.yt-channel { font-size: 12px; color: #555; font-weight: 500; }
+/* 3순위: 조회수·태그 — 작고 연하게 */
+.yt-foot { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 3px; }
+.yt-views { color: #FE5000; font-size: 11px; font-weight: 700; }
+.yt-sep { color: #d1d5db; font-size: 10px; }
+.yt-type { font-size: 10px; color: #9ca3af; background: #f3f4f6; padding: 1px 6px; border-radius: 3px; }
+.badge-green { background: #fff4f0; color: #c73d00; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block; border: 1px solid #ffd6c8; }
 .badge-blue  { background: #eff6ff; color: #1d4ed8; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-left: 3px; border: 1px solid #dbeafe; }
-.yt-link { font-size: 11px; color: #bec3cb; text-decoration: none; }
 .divider-space { height: 12px; }
 
 /* ── 뉴스/카페 리스트 ── */
-.news-item { padding: 8px 0; border-bottom: 1px solid #f1f2f4; }
+.news-item { padding: 10px 0; border-bottom: 1px solid #f0f1f3; }
 .news-item:last-child { border-bottom: none; padding-bottom: 0; }
-.news-title { font-size: 13px; font-weight: 600; color: #111; line-height: 1.45; margin-bottom: 2px; }
-.news-meta { font-size: 11px; color: #b0b4bc; }
+/* 1순위: 제목 — 굵고 */
+.news-title { font-size: 13px; font-weight: 700; color: #111; line-height: 1.45; margin-bottom: 4px; }
+.news-title a { color: #111; text-decoration: none; }
+.news-title a:hover { color: #FE5000; }
+/* 2순위: 출처명 — 중간 */
+.news-source { font-size: 11px; font-weight: 600; color: #555; }
+/* 3순위: 날짜 — 연하게 */
+.news-date { font-size: 11px; color: #b8bdc7; }
+.news-row { display: flex; align-items: center; gap: 5px; }
+.news-dot { color: #d1d5db; font-size: 9px; }
 
 /* 기타 정리 */
 .stMarkdown p { margin-bottom: 0 !important; }
@@ -520,16 +546,23 @@ if run_btn and (keyword or "").strip():
             with cols[i]:
                 st.markdown(f"""
                 <div class="yt-card">
-                  <div class="yt-head">
-                    <div class="yt-rank">{i+1}</div>
-                    <div class="yt-title">{safe_title}</div>
-                  </div>
-                  <a href="{r.get('url','')}" target="_blank" aria-label="영상 바로가기">
-                    <img class="yt-thumb" src="{thumb_url}">
+                  <!-- 썸네일 + 오버레이 -->
+                  <a class="yt-thumb-wrap" href="{r.get('url','')}" target="_blank">
+                    <img class="yt-thumb" src="{thumb_url}" loading="lazy">
+                    <span class="yt-rank">{i+1}</span>
+                    <span class="yt-view-overlay">{view_txt}</span>
                   </a>
-                  <div class="yt-meta">👤 {safe_channel} &nbsp;·&nbsp; 👁 {view_txt} &nbsp;·&nbsp; 🎬 {is_shorts}</div>
-                  <div>{meta_badge}{cmt_badge}</div>
-                  <a class="yt-link" target="_blank" href="{r.get('url','')}">🔗 영상 바로가기</a>
+                  <!-- 카드 본문 -->
+                  <div class="yt-body">
+                    <div class="yt-title">{safe_title}</div>
+                    <div class="yt-channel">{safe_channel}</div>
+                    <div class="yt-foot">
+                      <span class="yt-views">{view_txt}</span>
+                      <span class="yt-sep">·</span>
+                      <span class="yt-type">{is_shorts}</span>
+                      {meta_badge}{cmt_badge}
+                    </div>
+                  </div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -621,13 +654,20 @@ if run_btn and (keyword or "").strip():
             for _, row in nws_df.head(5).iterrows():
                 pub = row["pubDate"].strftime("%m/%d %H:%M") if pd.notna(row["pubDate"]) else ""
                 title_safe = html.escape(row.get("title", ""))
-                desc_safe  = html.escape((row.get("description") or "")[:100])
                 link = row.get("originallink") or row.get("link", "")
+                # 도메인에서 출처 추출 (예: n.news.naver.com/... → naver)
+                try:
+                    from urllib.parse import urlparse
+                    source = urlparse(row.get("originallink","")).netloc.replace("www.","").split(".")[0]
+                except Exception:
+                    source = ""
                 st.markdown(
                     f'<div class="news-item">'
-                    f'<div class="news-title"><a href="{link}" target="_blank" style="color:#111;text-decoration:none;">{title_safe}</a></div>'
-                    f'<div class="news-meta">{pub}</div>'
-                    f'</div>',
+                    f'<div class="news-title"><a href="{link}" target="_blank">{title_safe}</a></div>'
+                    f'<div class="news-row">'
+                    f'{"<span class=news-source>" + source + "</span><span class=news-dot>•</span>" if source else ""}'
+                    f'<span class="news-date">{pub}</span>'
+                    f'</div></div>',
                     unsafe_allow_html=True
                 )
         st.markdown('</div>', unsafe_allow_html=True)
@@ -646,9 +686,11 @@ if run_btn and (keyword or "").strip():
                 link = row.get("link", "")
                 st.markdown(
                     f'<div class="news-item">'
-                    f'<div class="news-title"><a href="{link}" target="_blank" style="color:#111;text-decoration:none;">{title_safe}</a></div>'
-                    f'<div class="news-meta">{cafe_safe}{" · " + pub if pub else ""}</div>'
-                    f'</div>',
+                    f'<div class="news-title"><a href="{link}" target="_blank">{title_safe}</a></div>'
+                    f'<div class="news-row">'
+                    f'{"<span class=news-source>" + cafe_safe + "</span><span class=news-dot>•</span>" if cafe_safe else ""}'
+                    f'{"<span class=news-date>" + pub + "</span>" if pub else ""}'
+                    f'</div></div>',
                     unsafe_allow_html=True
                 )
         st.markdown('</div>', unsafe_allow_html=True)
