@@ -120,19 +120,6 @@ with st.form("controls"):
         broad_mode = st.checkbox("브로드 모드", value=default_broad,
                                  help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색")
 
-# 실행 직후 URL 업데이트 + 자동 실행 플래그
-auto_run = bool((default_keyword or "").strip())  # URL에 q가 있으면 자동 실행
-if run_btn or auto_run:
-    st.query_params.update({
-        "q": (keyword or default_keyword or ""),
-        "h": str(hours_window),
-        "b": "1" if broad_mode else "0",
-    })
-    # (선택) 현재 URL 노출해서 복사 쉽게
-    try:
-        st.code(st.experimental_get_url(), language=None)
-    except Exception:
-        pass
 
 # --------------------------------------------------------------------------------------
 # Helpers (+ cache)
@@ -422,9 +409,7 @@ def section_card(title_html: str, body_render_fn):
 # --------------------------------------------------------------------------------------
 # Run
 # --------------------------------------------------------------------------------------
-if (run_btn or auto_run) and ((keyword or default_keyword or "").strip()):
-    if not (keyword or "").strip():
-        keyword = default_keyword
+if run_btn and (keyword or "").strip():
 
     st.markdown(f"**키워드:** `{keyword}` &nbsp;·&nbsp; **윈도우:** 최근 {hours_window}시간")
 
