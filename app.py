@@ -107,21 +107,6 @@ hr { border-color: #f0f2f5 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---- 사이드바 Hero + Controls -------------------------------------------------------
-with st.sidebar:
-    st.markdown('<div class="sidebar-logo">daily<em>shot</em> 키워드 체커</div>', unsafe_allow_html=True)
-    with st.form("controls"):
-        st.markdown('<div class="ctrl-label">키워드</div>', unsafe_allow_html=True)
-        keyword = st.text_input("키워드", placeholder="키워드를 입력하세요",
-                                value=default_keyword, label_visibility="collapsed")
-        st.markdown('<div class="ctrl-label">탐색 시간</div>', unsafe_allow_html=True)
-        hours_window = st.selectbox("탐색 시간", hours_options,
-                                    index=hours_options.index(default_hours), label_visibility="collapsed")
-        broad_mode = st.checkbox("브로드 모드", value=default_broad,
-                                 help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색")
-        st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
-        run_btn = st.form_submit_button("분석 실행 →", use_container_width=True, type="primary")
-
 # --------------------------------------------------------------------------------------
 # URL Query Params -> Defaults
 # --------------------------------------------------------------------------------------
@@ -147,24 +132,20 @@ except:
 
 default_broad = (str(b_raw) == "1")
 
-# --------------------------------------------------------------------------------------
-# Controls (레이블 줄 + 컨트롤 줄)
-# --------------------------------------------------------------------------------------
-with st.form("controls"):
-    lh1, lh2, lh3 = st.columns([4, 1.5, 1.2])
-    lh1.markdown("**키워드 입력**"); lh2.markdown("**탐색 시간**"); lh3.markdown("&nbsp;")
-
-    c1, c2, c3 = st.columns([4, 1.5, 1.2])
-    keyword = c1.text_input("키워드 입력", placeholder="키워드를 입력해주세요",
-                            value=default_keyword, label_visibility="collapsed")
-    hours_window = c2.selectbox("탐색 시간", hours_options,
-                                index=hours_options.index(default_hours), label_visibility="collapsed")
-    run_btn = c3.form_submit_button("분석 실행", use_container_width=True, type="primary")
-
-    opt1, opt2, opt3, opt4 = st.columns([2, 2, 2, 2])
-    with opt1:
+# ---- 사이드바 Hero + Controls -------------------------------------------------------
+with st.sidebar:
+    st.markdown('<div class="sidebar-logo">daily<em>shot</em> 키워드 체커</div>', unsafe_allow_html=True)
+    with st.form("controls"):
+        st.markdown('<div class="ctrl-label">키워드</div>', unsafe_allow_html=True)
+        keyword = st.text_input("키워드", placeholder="키워드를 입력하세요",
+                                value=default_keyword, label_visibility="collapsed")
+        st.markdown('<div class="ctrl-label">탐색 시간</div>', unsafe_allow_html=True)
+        hours_window = st.selectbox("탐색 시간", hours_options,
+                                    index=hours_options.index(default_hours), label_visibility="collapsed")
         broad_mode = st.checkbox("브로드 모드", value=default_broad,
                                  help="제목/설명/태그에 없어도 댓글·변형어까지 넓게 탐색")
+        st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
+        run_btn = st.form_submit_button("분석 실행 →", use_container_width=True, type="primary")
 
 
 # --------------------------------------------------------------------------------------
