@@ -609,37 +609,6 @@ if run_btn and (keyword or "").strip():
         st.markdown('<div class="section-title"><span class="section-dot" style="background:#ef4444;"></span> YouTube</div>', unsafe_allow_html=True)
         yt_df = _yt_body()
 
-    # -------------------- Google Trends --------------------
-    def _trends_body():
-        with st.spinner("Google Trends 로딩 중..."):
-            gdf, gerr = google_trends_pytrends(keyword, "KR")
-        if gerr:
-            trends_url = gerr if str(gerr).startswith("http") else f"https://trends.google.com/trends/explore?geo=KR&q={urllib.parse.quote(keyword or '')}"
-            st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
-            st.caption("일시적 제한으로 내부 차트를 생략했습니다.")
-            return pd.DataFrame()
-        st.line_chart(gdf.set_index("datetime")["interest"])
-        trends_url = f"https://trends.google.com/trends/explore?geo=KR&q={urllib.parse.quote(keyword or '')}"
-        st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
-        return gdf
-
-    with st.container(border=True):
-        st.markdown('<div class="section-title"><span class="section-dot" style="background:#3b82f6;"></span> Google Trends</div>', unsafe_allow_html=True)
-        tr_df = _trends_body()
-
-    # -------------------- Naver DataLab --------------------
-    def _naver_body():
-        with st.spinner("네이버 데이터랩 불러오는 중..."):
-            ndf, nerr = naver_datalab_searchtrend(keyword)
-        if nerr:
-            st.info(nerr); return pd.DataFrame()
-        st.line_chart(ndf.set_index("period")["search_ratio"])
-        return ndf
-
-    with st.container(border=True):
-        st.markdown('<div class="section-title"><span class="section-dot" style="background:#16a34a;"></span> 네이버 데이터랩</div>', unsafe_allow_html=True)
-        nv_df = _naver_body()
-
     # -------------------- Naver 뉴스 + 카페 (2-column) --------------------
     with st.spinner("네이버 뉴스 · 카페 검색 중..."):
         nws_df, nws_err = naver_search(keyword, "news", hours_window)
@@ -700,6 +669,39 @@ if run_btn and (keyword or "").strip():
     with nc2:
         st.markdown(_build_news_html(caf_df, caf_err, hours_window, "cafe"),
                     unsafe_allow_html=True)
+
+    # -------------------- Google Trends --------------------
+    def _trends_body():
+        with st.spinner("Google Trends 로딩 중..."):
+            gdf, gerr = google_trends_pytrends(keyword, "KR")
+        if gerr:
+            trends_url = gerr if str(gerr).startswith("http") else f"https://trends.google.com/trends/explore?geo=KR&q={urllib.parse.quote(keyword or '')}"
+            st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
+            st.caption("일시적 제한으로 내부 차트를 생략했습니다.")
+            return pd.DataFrame()
+        st.line_chart(gdf.set_index("datetime")["interest"])
+        trends_url = f"https://trends.google.com/trends/explore?geo=KR&q={urllib.parse.quote(keyword or '')}"
+        st.link_button("🔗 Google Trends에서 보기", trends_url, use_container_width=True)
+        return gdf
+
+    # -------------------- Naver DataLab --------------------
+    def _naver_body():
+        with st.spinner("네이버 데이터랩 불러오는 중..."):
+            ndf, nerr = naver_datalab_searchtrend(keyword)
+        if nerr:
+            st.info(nerr); return pd.DataFrame()
+        st.line_chart(ndf.set_index("period")["search_ratio"])
+        return ndf
+
+    ch1, ch2 = st.columns(2, gap="medium")
+    with ch1:
+        with st.container(border=True):
+            st.markdown('<div class="section-title"><span class="section-dot" style="background:#3b82f6;"></span> Google Trends</div>', unsafe_allow_html=True)
+            tr_df = _trends_body()
+    with ch2:
+        with st.container(border=True):
+            st.markdown('<div class="section-title"><span class="section-dot" style="background:#16a34a;"></span> 네이버 데이터랩</div>', unsafe_allow_html=True)
+            nv_df = _naver_body()
 
     # -------------------- Summary Card --------------------
     st.markdown("---")
