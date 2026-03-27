@@ -218,13 +218,10 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
     if not api_key:
         return pd.DataFrame(), "환경변수 YOUTUBE_API_KEY가 없습니다."
 
-    def variants(kw: str):
-        base = (kw or "").strip()
-        no_space = base.replace(" ", "")
-        v = {base, no_space, f"#{base}", f"#{no_space}"}
-        return [x for x in v if x]
+    base_kw = (keyword or "").strip()
+    no_space_kw = base_kw.replace(" ", "")
 
-    # ⚠ 마이크로초 제거 — YouTube API가 RFC 3339 microseconds를 무시/오파싱하는 케이스 방지
+    # ⚠ 마이크로초 제거 — YouTube API RFC 3339 파싱 이슈 방지
     published_after = (
         dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
     ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -243,45 +240,53 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
             f"YOUTUBE search ({order})"
         )
 
-    items = []
+    def _collect(q, order="date", max_results=25, use_region=True):
+        """검색 실행 → (video_id 리스트, 에러 or None)"""
+        data, err = _search_once(q, order=order, max_results=max_results, use_region=use_region)
+        if err:
+            return [], err
+        ids = [it.get("id", {}).get("videoId") for it in (data or {}).get("items", [])
+               if it.get("id", {}).get("videoId")]
+        return ids, None
+
+    # ── 단계적 검색: 찾으면 조기 종료 ──────────────────────────
+    video_ids = set()
     _errors = []
-    for q in variants(keyword):
-        # date 순 + relevance 순 병행 → description-only 매칭 커버
-        for order in ("date", "relevance"):
-            data, err = _search_once(q, order=order)
-            if err:
-                _errors.append(err)
-            if data and not err:
-                items += data.get("items", [])
 
-    # 결과 0 → regionCode/relevanceLanguage 제거 후 재시도 (필터 과도 방지)
-    if not items:
-        for q in [keyword.strip(), f'"{keyword.strip()}"']:
-            for order in ("date", "relevance"):
-                data, err = _search_once(q, order=order, use_region=False)
-                if err:
-                    _errors.append(err)
-                if data and not err:
-                    items += data.get("items", [])
+    # Phase 1: 원본 키워드, relevance (가장 효과적) — 1 call
+    ids, err = _collect(base_kw, order="relevance")
+    if err: _errors.append(err)
+    video_ids.update(ids)
 
-    video_ids = list({it.get("id", {}).get("videoId") for it in items if it.get("id", {}).get("videoId")})
+    # Phase 2: 원본 키워드, date — 1 call
+    ids, err = _collect(base_kw, order="date")
+    if err: _errors.append(err)
+    video_ids.update(ids)
 
-    # 브로드 모드: 개별 단어 검색 + 따옴표 완전일치 검색
+    # Phase 3: 붙여쓰기 변형 (다르면) — 최대 1 call
+    if no_space_kw != base_kw:
+        ids, err = _collect(no_space_kw, order="relevance")
+        if err: _errors.append(err)
+        video_ids.update(ids)
+
+    # Phase 4: 아직 0건이면 region 필터 제거 후 재시도 — 최대 2 calls
+    if not video_ids:
+        for q in [base_kw, f'"{base_kw}"']:
+            ids, err = _collect(q, order="relevance", use_region=False)
+            if err: _errors.append(err)
+            video_ids.update(ids)
+            if video_ids:
+                break  # 찾으면 즉시 중단
+
+    # Phase 5 (브로드 모드만): 개별 단어 검색 — 단어 수 × 1 call
     if broad_mode:
-        broad_queries = set()
-        words = [w for w in keyword.strip().split() if len(w) >= 2]
+        words = [w for w in base_kw.split() if len(w) >= 2]
         for w in words:
-            broad_queries.add(w)
-        broad_queries.add(f'"{keyword.strip()}"')
-        for bq in broad_queries:
-            for bm_order in ("date", "relevance"):
-                data_b, err_b = _search_once(bq, order=bm_order, max_results=50)
-                if err_b:
-                    _errors.append(err_b)
-                if data_b:
-                    items_b = data_b.get("items", [])
-                    video_ids += [it.get("id", {}).get("videoId") for it in items_b if it.get("id", {}).get("videoId")]
-        video_ids = list({v for v in video_ids if v})
+            ids, err = _collect(w, order="relevance", max_results=50)
+            if err: _errors.append(err)
+            video_ids.update(ids)
+
+    video_ids = list(video_ids)
 
     if not video_ids:
         if _errors:
@@ -323,7 +328,7 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
 
     MAX_COMMENT_CHECKS = 10  # 브로드 모드에서 댓글 API 호출 최대 횟수
     rows = []
-    needles = variants(keyword)
+    needles = list({base_kw, no_space_kw})
     comment_check_count = 0
     for it in data2.get("items", []):
         snip = it.get("snippet", {}) or {}
