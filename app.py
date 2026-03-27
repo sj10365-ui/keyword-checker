@@ -224,42 +224,68 @@ def youtube_search(keyword: str, api_key: str, hours: int = 24, broad_mode: bool
         v = {base, no_space, f"#{base}", f"#{no_space}"}
         return [x for x in v if x]
 
+    # ⚠ 마이크로초 제거 — YouTube API가 RFC 3339 microseconds를 무시/오파싱하는 케이스 방지
     published_after = (
         dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
-    ).isoformat().replace("+00:00", "Z")
+    ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
-    def _search_once(q):
+    def _search_once(q, order="date", max_results=25, use_region=True):
+        params = {
+            "part": "snippet", "q": q, "type": "video", "order": order,
+            "maxResults": max_results, "publishedAfter": published_after,
+            "key": api_key,
+        }
+        if use_region:
+            params["regionCode"] = "KR"
+            params["relevanceLanguage"] = "ko"
         return _yt_request(
-            "https://www.googleapis.com/youtube/v3/search",
-            {"part": "snippet", "q": q, "type": "video", "order": "date",
-             "maxResults": 25, "publishedAfter": published_after,
-             "regionCode": "KR", "relevanceLanguage": "ko", "key": api_key},
-            "YOUTUBE search"
+            "https://www.googleapis.com/youtube/v3/search", params,
+            f"YOUTUBE search ({order})"
         )
 
     items = []
+    _errors = []
     for q in variants(keyword):
-        data, err = _search_once(q)
-        if data and not err:
-            items += data.get("items", [])
+        # date 순 + relevance 순 병행 → description-only 매칭 커버
+        for order in ("date", "relevance"):
+            data, err = _search_once(q, order=order)
+            if err:
+                _errors.append(err)
+            if data and not err:
+                items += data.get("items", [])
+
+    # 결과 0 → regionCode/relevanceLanguage 제거 후 재시도 (필터 과도 방지)
+    if not items:
+        for q in [keyword.strip(), f'"{keyword.strip()}"']:
+            for order in ("date", "relevance"):
+                data, err = _search_once(q, order=order, use_region=False)
+                if err:
+                    _errors.append(err)
+                if data and not err:
+                    items += data.get("items", [])
 
     video_ids = list({it.get("id", {}).get("videoId") for it in items if it.get("id", {}).get("videoId")})
 
-    # 브로드 모드: 키워드 없이 최근 업로드도 후보에 추가
+    # 브로드 모드: 개별 단어 검색 + 따옴표 완전일치 검색
     if broad_mode:
-        data_b, _ = _yt_request(
-            "https://www.googleapis.com/youtube/v3/search",
-            {"part": "snippet", "type": "video", "order": "date",
-             "maxResults": 25, "publishedAfter": published_after,
-             "regionCode": "KR", "relevanceLanguage": "ko", "key": api_key},
-            "YOUTUBE recent feed"
-        )
-        if data_b:
-            items_b = data_b.get("items", [])
-            video_ids += [it.get("id", {}).get("videoId") for it in items_b if it.get("id", {}).get("videoId")]
-            video_ids = list({v for v in video_ids if v})
+        broad_queries = set()
+        words = [w for w in keyword.strip().split() if len(w) >= 2]
+        for w in words:
+            broad_queries.add(w)
+        broad_queries.add(f'"{keyword.strip()}"')
+        for bq in broad_queries:
+            for bm_order in ("date", "relevance"):
+                data_b, err_b = _search_once(bq, order=bm_order, max_results=50)
+                if err_b:
+                    _errors.append(err_b)
+                if data_b:
+                    items_b = data_b.get("items", [])
+                    video_ids += [it.get("id", {}).get("videoId") for it in items_b if it.get("id", {}).get("videoId")]
+        video_ids = list({v for v in video_ids if v})
 
     if not video_ids:
+        if _errors:
+            return pd.DataFrame(), f"검색 실패 — {_errors[0]}"
         return pd.DataFrame(), "최근 업로드 결과 없음"
 
     data2, err2 = _yt_request(
